@@ -24,7 +24,7 @@ It presents nine top-level folders, each corresponding to a distinct language.
 
 Within each language folder, there are five sub-folders, each representing a specific singing technique.
 
-These technique folders contain numerous song entries, with each song further divided into several controlled comparison groups: a control group (natural singing without the specific technique), a technique group (densely employing the specific technique).
+These technique folders contain numerous song entries, with each song further divided into several controlled comparison groups: a control group (natural singing without the specific technique), and a technique group (densely employing the specific technique).
 
 Our singing voices and speech are recorded at a 48kHz sampling rate with 24-bit resolution in WAV format. 
 
@@ -128,23 +128,18 @@ The code for preprocessing the dataset is provided in `./data_process/data_prepr
 
 ## Technique Controllable Singing Voice Synthesis
 
+The code for our benchmarks for [Technique Controllable Singing Voice Synthesis](./Technique-Controllable SVS/readme.md)
 
 ## Technique Recognition
 
+The code for our benchmarks for [Technique Recognition](./Technique Recognition/readme.md)
 
 ## Style Transfer
 
+The code for our benchmarks for [Style Transfer](./Style Transfer/readme.md)
 
 ## Speech-to-Singing Conversion
 
-
-## License
-
-
-## Acknowledgements
-
-
-## Citation
-
+The code for our benchmarks for [Speech-to-Singing Conversion](./STS Conversion/readme.md)
 
  ![visitors](https://visitor-badge.laobi.icu/badge?page_id=GTSinger/GTSinger)
