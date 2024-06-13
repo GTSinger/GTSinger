@@ -128,8 +128,7 @@ The code for preprocessing the dataset is provided in `./data_process/data_prepr
 
 ## Technique Controllable Singing Voice Synthesis
 
-The code for our benchmarks for [Technique Controllable Singing Voice Synthesis](./Technique-Controllable-SVS/readme.md)
-[config](./configs/singing/speech2singing/alignsts.yaml)
+The code for our benchmarks for [Technique Controllable Singing Voice Synthesis](./Technique-Controllable-SVS/readme.md).
 
 ## Technique Recognition
 
