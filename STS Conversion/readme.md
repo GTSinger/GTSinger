@@ -17,7 +17,7 @@ CUDA_VISIBLE_DEVICES=0 python tasks/run.py --exp_name alignsts --reset --hparams
 
 ### Inference
 
-`Run
+Run
 ```bash
 CUDA_VISIBLE_DEVICES=0 python tasks/run.py --exp_name alignsts --infer --hparams "gen_dir_name=test" --config configs/singing/speech2singing/alignsts.yaml --reset
 ```
