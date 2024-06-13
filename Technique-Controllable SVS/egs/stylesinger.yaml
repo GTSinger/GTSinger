@@ -1,0 +1,199 @@
+base_config:
+  - egs/egs_bases/tts/fs2.yaml
+  - egs/datasets/audio/emotion/base_text2mel.yaml
+task_cls: tasks.StyleSinger.stylesinger.StyleSingerTask
+
+# emotion encoder
+emotion_encoder_path: checkpoints/global.pt # set the emotion encoder path
+
+# vocoder
+vocoder: HifiGAN_NSF
+vocoder_ckpt: checkpoints/hifigan
+use_nsf: true
+
+# dataset
+processed_data_dir: 'data/processed/style'
+binary_data_dir: 'data/binary/style'
+test_input_dir: ''
+
+# choices of models
+emo: true
+save_f0: true
+f0_gen: 'gmdiff'
+decoder: 'diffsinger'
+style: true
+umln: true
+
+# process
+binarizer_cls: data_gen.style_binarizer.StyleSingingBinarizer
+audio_sample_rate: 48000
+hop_size: 256
+win_size: 1024
+fft_size: 1024
+fmax: 24000
+fmin: 20
+max_frames: 3000
+fft_size: 1024  # Extra window size is filled with 0 paddings to match this parameter
+min_level_db: -100
+ref_level_db: 20
+
+# dataset processing
+binarization_args:
+  reset_phone_dict: true
+  reset_word_dict: true
+  shuffle: false
+  trim_eos_bos: false
+  trim_sil: false
+  with_align: true
+  with_f0: true
+  with_f0cwt: false
+  with_linear: false
+  with_spk_embed: true
+  with_spk_id: true
+  with_txt: true
+  with_wav: true
+  with_word: true
+
+preprocess_cls: egs.datasets.audio.libritts.pre_align.LibrittsPreAlign
+preprocess_args:
+  nsample_per_mfa_group: 1000
+  # text process
+  txt_processor: zh
+  use_mfa: true
+  with_phsep: true
+  reset_phone_dict: true
+  reset_word_dict: true
+  add_eos_bos: true
+  # mfa
+  mfa_group_shuffle: false
+  mfa_offset: 0.02
+  # wav processors
+  wav_processors: []
+  save_sil_mask: true
+  vad_max_silence_length: 12
+  use_tone: false
+
+# data
+word_dict_size: 20000
+num_spk: 150
+use_spk_embed: true
+use_spk_id: false
+use_word: true
+use_emotion: true
+emo_size: 256
+use_gt_dur: false
+use_gt_f0: false
+
+pitch_norm: 'log'
+max_input_tokens: 2000
+max_tokens: 10000
+use_txt_cond: true
+val_check_interval: 5000
+valid_infer_interval: 5000
+lambda_word_dur: 0
+audio_num_mel_bins: 80
+use_uv: true
+use_tone: true
+
+# training
+num_sanity_val_steps: -1
+max_updates: 320000
+max_sentences: 100000
+num_test_samples: 72
+
+# rq extractor
+lambda_commit: 0.25
+rq_start: 20500
+vae_dropout: 0.0
+nRQ: 128
+forcing: 20000
+crop: false
+predictor_grad: 1.0
+rq_depth: 4
+
+# f0 gmdiff
+gaussian_start: True
+f0_dilation_cycle_length: 4  # *
+predictor_layers: 5
+diff_loss_type: l1
+diff_decoder_type: 'wavenet'
+f0_max_beta: 0.06
+f0_residual_layers: 10
+f0_residual_channels: 192
+optimizer_adam_beta1: 0.9
+optimizer_adam_beta2: 0.98
+weight_decay: 0
+keep_bins: 80
+f0_timesteps: 100
+f0_K_step: 100
+f0_infer_with_ref: false
+save_gt: true
+
+# diffsinger
+schedule_type: 'linear'
+decay_steps: 50000
+dilation_cycle_length: 4  # *
+residual_layers: 20
+residual_channels: 256
+max_beta: 0.06
+timesteps: 100
+K_step: 100
+spec_min: [-6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0, -6.0]
+spec_max: [0.03640973940491676, 0.039425432682037354, 0.29524752497673035, 0.45784831047058105, 0.48333120346069336, 0.5335848927497864, 0.6071611046791077, 0.5474293828010559, 0.6076506972312927, 0.5390501022338867, 0.5743886232376099, 0.485751211643219, 0.4248744249343872, 0.4843744933605194, 0.43331536650657654, 0.5356124639511108, 0.4875929355621338, 0.48614853620529175, 0.44228559732437134, 0.5027499198913574, 0.6554337739944458, 0.3469322919845581, 0.33981558680534363, 0.37933868169784546, 0.34751009941101074, 0.22094282507896423, 0.252963662147522, 0.18274202942848206, 0.1976650059223175, 0.1770155429840088, 0.18206502497196198, 0.1002601608633995, 0.18640224635601044, 0.27240633964538574, 0.04153885692358017, -0.010289354249835014, -0.012929759919643402, 0.035185474902391434, 0.18124309182167053, -0.14512233436107635, -0.1778590828180313, -0.20491982996463776, -0.30119436979293823, -0.1735714226961136, -0.1039585992693901, -0.177497997879982, -0.28803232312202454, -0.24049188196659088, -0.4682924747467041, -0.5791841745376587, -0.5170156955718994, -0.6380605697631836, -0.7147259712219238, -0.6607836484909058, -0.7288452982902527, -0.6338580250740051, -0.7092624306678772, -0.8101216554641724, -0.7633087038993835, -0.8251329660415649, -0.6936700940132141, -0.5180960297584534, -0.7972619533538818, -0.807314932346344, -0.7151175737380981, -0.7785399556159973, -0.8709449768066406, -0.8360402584075928, -0.8253681659698486, -0.9778416156768799, -1.12929368019104, -1.3274869918823242, -1.3071579933166504, -1.5234452486038208, -1.6191706657409668, -1.708594799041748, -1.8246771097183228, -1.9193823337554932, -2.1361801624298096, -2.3829283714294434]
+
+# prodiff
+# timesteps: 8
+# timescale: 1
+# K_step: 1000
+# schedule_type: 'vpsde'
+# max_beta: 0.06
+# pndm_speedup: 10
+# # DiffNet
+# residual_layers: 20
+# residual_channels: 256
+# dilation_cycle_length: 4
+
+# spec_min: [-6.8276, -7.0270, -6.8142, -7.1429, -7.6669, -7.6000, -7.1148, -6.9640,
+#            -6.8414, -6.6596, -6.6880, -6.7439, -6.7986, -7.4940, -7.7845, -7.6586,
+#            -6.9288, -6.7639, -6.9118, -6.8246, -6.7183, -7.1769, -6.9794, -7.4513,
+#            -7.3422, -7.5623, -6.9610, -6.8158, -6.9595, -6.8403, -6.5688, -6.6356,
+#            -7.0209, -6.5002, -6.7819, -6.5232, -6.6927, -6.5701, -6.5531, -6.7069,
+#            -6.6462, -6.4523, -6.5954, -6.4264, -6.4487, -6.7070, -6.4025, -6.3042,
+#            -6.4008, -6.3857, -6.3903, -6.3094, -6.2491, -6.3518, -6.3566, -6.4168,
+#            -6.2481, -6.3624, -6.2858, -6.2575, -6.3638, -6.4520, -6.1835, -6.2754,
+#            -6.1253, -6.1645, -6.0638, -6.1262, -6.0710, -6.1039, -6.4428, -6.1363,
+#            -6.1054, -6.1252, -6.1797, -6.0235, -6.0758, -5.9453, -6.0213, -6.0446]
+# spec_max: [ 0.2645,  0.0583, -0.2344, -0.0184,  0.1227,  0.1533,  0.1103,  0.1212,
+#             0.2421,  0.1809,  0.2134,  0.3161,  0.3301,  0.3289,  0.2667,  0.2421,
+#             0.2581,  0.2600,  0.1394,  0.1907,  0.1082,  0.1474,  0.1680,  0.2550,
+#             0.1057,  0.0826,  0.0423,  0.1203, -0.0701, -0.0056,  0.0477, -0.0639,
+#             -0.0272, -0.0728, -0.1648, -0.0855, -0.2652, -0.1998, -0.1547, -0.2167,
+#             -0.4181, -0.5463, -0.4161, -0.4733, -0.6518, -0.5387, -0.4290, -0.4191,
+#             -0.4151, -0.3042, -0.3810, -0.4160, -0.4496, -0.2847, -0.4676, -0.4658,
+#             -0.4931, -0.4885, -0.5547, -0.5481, -0.6948, -0.7968, -0.8455, -0.8392,
+#             -0.8770, -0.9520, -0.8749, -0.7297, -0.8374, -0.8667, -0.7157, -0.9035,
+#             -0.9219, -0.8801, -0.9298, -0.9009, -0.9604, -1.0537, -1.0781, -1.3766]
+
+# set split, input item name
+valid_prefixes: [
+'少女音#九张机#0',
+'少女音#九张机#1',
+'少女音#九张机#2',
+'少女音#九张机#3',
+'少女音#九张机#4',
+'少女音#九张机#5',
+'少女音#九张机#6',
+'少女音#九张机#7',
+'少女音#九张机#8'
+]
+test_prefixes: [
+'少女音#九张机#0',
+'少女音#九张机#1',
+'少女音#九张机#2',
+'少女音#九张机#3',
+'少女音#九张机#4',
+'少女音#九张机#5',
+'少女音#九张机#6',
+'少女音#九张机#7',
+'少女音#九张机#8'
+]
