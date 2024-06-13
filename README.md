@@ -128,18 +128,19 @@ The code for preprocessing the dataset is provided in `./data_process/data_prepr
 
 ## Technique Controllable Singing Voice Synthesis
 
-The code for our benchmarks for [Technique Controllable Singing Voice Synthesis](./Technique-Controllable SVS/readme.md)
+The code for our benchmarks for [Technique Controllable Singing Voice Synthesis](./Technique-Controllable-SVS/readme.md)
+[config](./configs/singing/speech2singing/alignsts.yaml)
 
 ## Technique Recognition
 
-The code for our benchmarks for [Technique Recognition](./Technique Recognition/readme.md)
+The code for our benchmarks for [Technique Recognition](./Technique-Recognition/readme.md).
 
 ## Style Transfer
 
-The code for our benchmarks for [Style Transfer](./Style Transfer/readme.md)
+The code for our benchmarks for [Style Transfer](./Style-Transfer/readme.md).
 
 ## Speech-to-Singing Conversion
 
-The code for our benchmarks for [Speech-to-Singing Conversion](./STS Conversion/readme.md)
+The code for our benchmarks for [Speech-to-Singing-Conversion](./STS Conversion/readme.md).
 
  ![visitors](https://visitor-badge.laobi.icu/badge?page_id=GTSinger/GTSinger)
