@@ -1,0 +1,202 @@
+base_config:
+  - configs/singing/fs2.yaml
+  - configs/singing/speech2singing/base.yaml
+mfa_version: 2
+
+binary_data_dir: 'data/binary/speech2singing-testdata'
+
+spk_embed_size: 256
+
+model_ckpt: ''
+pe_enable: False
+use_speech_mel: False
+use_speech_spenv: False
+use_speech_mel_mono: False
+use_speech_spenv_reduced: False
+use_gt_dur: True
+use_gt_f0: True
+use_sing_spenv: False
+use_sing_spenv_reduced: True
+sing_spenv_reduced_coef: 35
+use_gt_sing_spenv: False
+use_speech_wav2vec2_mono: True
+use_sing_input: False
+use_sing_wav2vec2: False
+spenv_filter: 0.0
+
+task_cls: tasks.speech2singing.diffvae.DiffVAETask
+vocoder: vocoders.hifigan.HifiGAN
+vocoder_ckpt: checkpoints/hifigan  # chinese song checkpoints
+vocoder_use_f0: True
+
+gn_chs_grp: 16                  # chs_grp | group norm
+
+rhythm_enc_neck: 32
+rhythm_enc_freq: 1
+rhythm_enc_hidden: 128
+rhythm_enc_kernel: 7
+rhythm_enc_stride: 2
+rhythm_enc_padding: 3
+rhythm_enc_dilation: 1
+rhythm_enc_layers: 2
+rhythm_enc_rnn_layers: 1
+#rhythm_enc_bidirectional: True
+
+content_enc_inp: 32
+content_enc_hidden: 256
+content_enc_kernel: 3
+content_enc_stride: 1
+content_enc_padding: 1
+content_enc_dilation: 1
+content_enc_layers: 2
+
+f0_embed_size: 256
+f0_enc_hidden: 256
+f0_enc_kernel: 5
+f0_enc_stride: 1
+f0_enc_padding: 2
+f0_enc_dilation: 1
+f0_enc_layers: 3
+
+use_rhythm_pred: True
+rhythm_pred_use_cont: True  # use content info (use attn)
+rhythm_pred_hidden: 128
+rhythm_pred_ffn_kernel: 9
+rhythm_pred_num_heads: 1
+rhythm_pred_kernel: 5
+rhythm_pred_padding: SAME
+rhythm_pred_stride: 2
+rhythm_pred_layers: 2
+rhythm_pred_cf_layers: 1
+rhythm_pred_dropout: 0.8
+rhythm_pred_cf_dropout: 0.8
+rhythm_pred_win_size: 0.3
+rhythm_n_embed: 6
+lambda_rhythm_commit: 0.25
+lambda_rhythm_pred: 0.1
+rhythm_pred_act_steps: 0
+rhythm_pred_use_stepcf: False
+rhythm_pred_stepcf_n_blocks: 4
+rhythm_pred_stepcf_overlap: 0.5
+rhythm_pred_cf_type: base
+plot_rhythm: True
+
+diffvae_type: diffvae3
+hidden_size: 256    # same as diffvae_hidden
+diffvae_hidden: 256
+fs2_layers: 4
+diffvae_enc_proj_type:
+diffvae_decoder: prodiff
+f0_bridge: True
+q_rhythm_bridge: False
+wav2vec2_size: 32
+plot_wav: True
+
+# crossformer
+cf_type: base     # [base, content_based]
+plot_attn_diffvae: True
+diffvae_ffn_kernel: 9
+diffvae_num_heads: 2
+diffvae_dropout: 0.1
+diffvae_win_size: 0.2
+# base crossformer
+diffvae_layers: 2
+num_guided_layers: 2
+forcing: 0
+guided_sigma: 0.1
+lambda_guided_loss: 40
+diffvae_use_stepcf: False
+diffvae_stepcf_n_blocks: 4
+diffvae_stepcf_overlap: 0.5
+# content-based crossformer
+cf_cb_use_conv: False
+cf_cb_conv_kernel_num: 32   # cb: content based
+cf_cb_conv_kernel_size: 9
+cf_cb_conv_win_size: 0.4
+cf_cb_use_forward_attn: False
+
+# ASR
+use_asr: False
+use_bpe: False
+freeze_asr: True
+asr_act_steps: 0
+lambda_asr: 1.0
+decoder_hidden_size: 256
+decoder_rnn_dim: 256
+p_attention_dropout: 0.05
+p_decoder_dropout: 0.05
+attention_rnn_dim: 256
+attention_dim: 128
+attention_location_n_filters: 16
+attention_location_kernel_size: 15
+enc_ffn_kernel_size: 31
+encoder_hidden_size: 144
+enc_layers: 12
+dec_layers: 2
+
+# DiffNet
+residual_layers: 20
+residual_channels: 256
+dilation_cycle_length: 4
+
+# DiffDecoder
+max_updates: 200000
+lr: 2.
+timesteps: 4
+timescale: 1
+K_step: 1000
+diff_loss_type: l1
+diff_decoder_type: 'wavenet'
+schedule_type: 'vpsde'
+max_beta: 0.06
+fs2_ckpt: ''
+use_nsf: true
+keep_bins: 80
+pndm_speedup: 10
+gaussian_start: True
+
+# ablation study
+wo_rhythm_adaptor: False
+wo_content_rhythm_aligner: False
+
+# data preprocessing
+lifter_cutoff: 3
+num_test_samples: 0
+
+spec_min: [-6.8276, -7.0270, -6.8142, -7.1429, -7.6669, -7.6000, -7.1148, -6.9640,
+           -6.8414, -6.6596, -6.6880, -6.7439, -6.7986, -7.4940, -7.7845, -7.6586,
+           -6.9288, -6.7639, -6.9118, -6.8246, -6.7183, -7.1769, -6.9794, -7.4513,
+           -7.3422, -7.5623, -6.9610, -6.8158, -6.9595, -6.8403, -6.5688, -6.6356,
+           -7.0209, -6.5002, -6.7819, -6.5232, -6.6927, -6.5701, -6.5531, -6.7069,
+           -6.6462, -6.4523, -6.5954, -6.4264, -6.4487, -6.7070, -6.4025, -6.3042,
+           -6.4008, -6.3857, -6.3903, -6.3094, -6.2491, -6.3518, -6.3566, -6.4168,
+           -6.2481, -6.3624, -6.2858, -6.2575, -6.3638, -6.4520, -6.1835, -6.2754,
+           -6.1253, -6.1645, -6.0638, -6.1262, -6.0710, -6.1039, -6.4428, -6.1363,
+           -6.1054, -6.1252, -6.1797, -6.0235, -6.0758, -5.9453, -6.0213, -6.0446]
+spec_max: [ 0.2645,  0.0583, -0.2344, -0.0184,  0.1227,  0.1533,  0.1103,  0.1212,
+            0.2421,  0.1809,  0.2134,  0.3161,  0.3301,  0.3289,  0.2667,  0.2421,
+            0.2581,  0.2600,  0.1394,  0.1907,  0.1082,  0.1474,  0.1680,  0.2550,
+            0.1057,  0.0826,  0.0423,  0.1203, -0.0701, -0.0056,  0.0477, -0.0639,
+            -0.0272, -0.0728, -0.1648, -0.0855, -0.2652, -0.1998, -0.1547, -0.2167,
+            -0.4181, -0.5463, -0.4161, -0.4733, -0.6518, -0.5387, -0.4290, -0.4191,
+            -0.4151, -0.3042, -0.3810, -0.4160, -0.4496, -0.2847, -0.4676, -0.4658,
+            -0.4931, -0.4885, -0.5547, -0.5481, -0.6948, -0.7968, -0.8455, -0.8392,
+            -0.8770, -0.9520, -0.8749, -0.7297, -0.8374, -0.8667, -0.7157, -0.9035,
+            -0.9219, -0.8801, -0.9298, -0.9009, -0.9604, -1.0537, -1.0781, -1.3766]
+
+###########
+# train and eval
+###########
+max_tokens: 20000
+max_sentences: 16
+max_eval_sentences: 1
+max_eval_tokens: 60000
+train_set_name: 'train'
+valid_set_name: 'valid'
+test_set_name: 'test'
+profile_infer: false
+out_wav_norm: false
+save_gt: true
+save_f0: false
+gen_dir_name: ''
+save_best: true

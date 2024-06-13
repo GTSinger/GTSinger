@@ -1,0 +1,13 @@
+# only used for mfa
+base_config:
+  - configs/tts/fs2.yaml
+  - configs/singing/base.yaml
+  - configs/singing/fs2.yaml
+  - configs/singing/speech2singing/base.yaml
+mfa_version: 2
+raw_data_dir: 'data/raw/speech2singing'
+processed_data_dir: 'data/processed/speech2singing'
+
+datasets: [
+  # TBD
+]

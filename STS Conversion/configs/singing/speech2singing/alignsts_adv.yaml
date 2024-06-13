@@ -1,0 +1,5 @@
+base_config:
+  - configs/tts/fs2_adv.yaml
+  - configs/singing/speech2singing/alignsts.yaml
+
+task_cls: tasks.speech2singing.diffvae_adv.Sp2SingAdvTask

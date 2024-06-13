@@ -1,0 +1,21 @@
+base_config:
+  - configs/singing/speech2singing/alignsts.yaml
+
+task_cls: tasks.speech2singing.diffvae.TransformerASRTask
+
+use_speech_mel: True
+use_speech_spenv: False
+use_speech_mel_mono: False
+use_gt_dur: True
+use_gt_f0: True
+use_sing_spenv: False  # predefined in base.
+use_sing_spenv_reduced: False
+sing_spenv_reduced_coef: 1
+use_gt_sing_spenv: False
+use_speech_wav2vec2_mono: False
+
+lr: 1.
+max_sentences: 32
+max_frames: 3000
+max_tokens: 40000
+max_updates: 80000

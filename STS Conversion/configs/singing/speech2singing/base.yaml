@@ -1,0 +1,38 @@
+raw_data_dir: '/data/raw/speech2singing'
+processed_data_dir: 'data/processed/speech2singing-short'
+binary_data_dir: 'data/binary/speech2singing-testdata'
+pre_align_args:
+  txt_processor: en
+binarizer_cls: data_gen.singing.speech2singing.binarize.Speech2SingingBinarizer
+
+binarization_args:
+  with_wav: false
+  with_wav_mono: false   # just for hearing
+  with_sing_mel: true
+  with_sing_spenv: true
+  with_sing_wav2vec2: true
+  with_speech_wav2vec2_mono: true
+  with_speech_mel: true
+  with_speech_spenv: false
+  with_speech_mel_mono: true
+  with_bpe: true
+
+hop_size: 128
+fft_size: 512
+win_size: 512
+audio_sample_rate: 24000
+audio_num_mel_bins: 80
+
+num_spk: 20
+datasets: [
+  # TBD
+]
+
+spk_list: [
+  # TBD
+]
+
+test_prefixes: [
+  # TBD
+]
+
