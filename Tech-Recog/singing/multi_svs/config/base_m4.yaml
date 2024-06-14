@@ -1,0 +1,16 @@
+base_config: singing/multi_svs/config/base_xiaoma.yaml
+binary_data_dir: 'data/binary/m4_zhengshu'
+processed_data_dir: 'data/processed/m4_zhengshu'
+
+binarizer_cls: singing.multi_svs.config.singing_binarizer.MIDISingingBinarizer
+
+test_prefixes: [
+    'Alto-2#岁月神偷',
+    'Alto-2#奇妙能力歌',
+    'Tenor-1#一千年以后',
+    'Tenor-1#童话',
+    'Tenor-2#消愁',
+    'Tenor-2#一荤一素',
+    'Soprano-1#念奴娇赤壁怀古',
+    'Soprano-1#问春',
+]

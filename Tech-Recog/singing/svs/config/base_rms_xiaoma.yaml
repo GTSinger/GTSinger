@@ -1,0 +1,43 @@
+base_config: singing/svs/config/base_rms.yaml
+
+binary_data_dir: 'data/binary/xiaoma'
+processed_data_dir: '/mnt/sdb/liruiqi/datasets/xiaoma'
+
+binarizer_cls: singing.svs.config.rms_binarizer.MIDISingingBinarizer
+
+load_tts_ckpt: ''
+
+test_prefixes: [
+  "菊花台",
+  "我只在乎你",
+]
+valid_prefixes: [
+  "菊花台",
+  "我只在乎你",
+]
+
+pe: rmvpe  # rmvpe|parselmouth|pw
+pe_ckpt: checkpoints/rmvpe/model.pt
+f0_filepath: /mnt/sdb/liruiqi/datasets/xiaoma/f0_rmvpe_hop256_sr48000.npy
+f0_max: 900
+f0_min: 50
+
+num_spk: 93
+use_spk_id: false
+use_spk_embed: true
+
+binarization_args:
+  reset_phone_dict: true
+  reset_word_dict: true
+  shuffle: false
+  trim_eos_bos: false
+  trim_sil: false
+  with_align: true
+  with_f0: true
+  with_f0cwt: false
+  with_linear: false
+  with_spk_embed: true
+  with_spk_id: false
+  with_txt: true
+  with_wav: true
+  with_word: true

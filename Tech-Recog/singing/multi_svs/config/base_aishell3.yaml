@@ -1,0 +1,9 @@
+base_config: egs/datasets/audio/lj/fs.yaml
+binary_data_dir: '/home/renyi/hjz/NeuralSeq/data/binary/aishell3'
+task_cls: singing.multi_svs.multi_singer.MultiSpeakerTask
+
+use_spk_id: true
+use_energy_embed: false
+use_pitch_embed: true
+max_tokens: 24000
+num_spk: 500
