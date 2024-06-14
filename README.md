@@ -90,7 +90,7 @@ Here is the data structure of our dataset:
 
 ### Code for preprocessing
 
-The code for processing the dataset is provided in the `./data_process`.
+The code for processing the dataset is provided in the `./Data-Process`.
 
 #### Dependencies
 
@@ -104,7 +104,7 @@ pip install -r requirements.txt
 
 #### Data Check
 
-The code for checking the dataset is provided in `./data_process/data_check/`, including the following files:
+The code for checking the dataset is provided in `./Data-Process/data_check/`, including the following files:
 
 - `check_file_and_folder.py`: Check the file and folder structure of the dataset.
 
@@ -118,7 +118,7 @@ The code for checking the dataset is provided in `./data_process/data_check/`, i
 
 #### Data Preprocessing
 
-The code for preprocessing the dataset is provided in `./data_process/data_preprocess/`, including the following files:
+The code for preprocessing the dataset is provided in `./Data-Process/data_preprocess/`, including the following files:
 
 - `gen_final_json.py`: Generate the final JSON file for each singing voice based on the TextGrid file and musicxml file that have been annotated.
 
@@ -132,7 +132,7 @@ The code for our benchmarks for [Technique Controllable Singing Voice Synthesis]
 
 ## Technique Recognition
 
-The code for our benchmarks for [Technique Recognition](./Technique%20Recognition/readme.md).
+The code for our benchmarks for [Technique Recognition](./Technique-Recognition/readme.md).
 
 ## Style Transfer
 
