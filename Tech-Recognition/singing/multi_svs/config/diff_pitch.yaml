@@ -1,0 +1,29 @@
+base_config: singing/multi_svs/config/base_xiaoma.yaml
+task_cls: singing.multi_svs.multi_singer.PitchDiffTask
+binary_data_dir: data/binary/xiaoma_m4_opensvi
+
+max_tokens: 8000
+val_check_interval: 8000
+max_updates: 1000000
+
+diff_layers: 10
+diff_kernel_size: 5
+diff_heads: 2
+residual_channels: 64
+diff_hidden_size: 512
+optional_size: 192
+
+pretrain_singer: "/home/renyi/hjz/NATSpeech/checkpoints/multi_svs/base/model_ckpt_steps_120000.ckpt"
+
+test_prefixes: [
+    'Alto-2#岁月神偷',
+    'Alto-2#奇妙能力歌',
+    'Tenor-1#一千年以后',
+    'Tenor-1#童话',
+    'Tenor-2#消愁',
+    'Tenor-2#一荤一素',
+    'Soprano-1#念奴娇赤壁怀古',
+    'Soprano-1#问春',
+]
+
+test_ids: []

@@ -1,0 +1,36 @@
+base_config: egs/datasets/audio/lj/fs.yaml
+binary_data_dir: 'data/binary/xiaoma'
+processed_data_dir: 'data/processed/xiaoma'
+save_codes: ['singing']
+binarizer_cls: singing.multi_svs.config.singing_binarizer.SingingBinarizer
+task_cls: singing.multi_svs.multi_singer.MultiSingerTask
+audio_sample_rate: 24000
+hop_size: 128            # Hop size.
+fft_size: 512           # FFT size.
+win_size: 512           # FFT size.
+fmin: 30
+fmax: 12000
+
+num_spk: 200
+
+test_prefixes: []
+
+diff_layers: 10
+diff_kernel_size: 5
+diff_heads: 2
+residual_channels: 64
+diff_hidden_size: 384
+optional_size: 192
+
+use_spk_id: false
+use_spk_embed: true
+use_energy_embed: false
+use_pitch_embed: true
+max_tokens: 48000
+
+max_frames: 3000
+
+midi_f0_prior: true
+
+vocoder: HifiGAN_NSF
+vocoder_ckpt: checkpoints/m4singer_hifigan

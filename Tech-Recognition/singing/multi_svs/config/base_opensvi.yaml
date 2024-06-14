@@ -1,0 +1,5 @@
+base_config: singing/multi_svs/config/base_xiaoma.yaml
+binary_data_dir: 'data/binary/opensvi'
+processed_data_dir: 'data/processed/opensvi'
+
+binarizer_cls: singing.multi_svs.config.singing_binarizer.MIDISingingBinarizer

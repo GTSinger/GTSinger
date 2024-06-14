@@ -1,0 +1,61 @@
+# base config for RMS singing
+base_config: egs/datasets/audio/lj/fs.yaml
+task_cls: singing.svs.midi_singer.MIDISingerTask
+# binary_data_dir: '/home/renyi/hjz/NeuralSeq/data/binary/staff_test'
+binary_data_dir: 'data/binary/xiaom_new'
+processed_data_dir: 'data/processed/xiaoma_new'
+binarizer_cls: singing.svs.config.crepe_save.CrepeSingingBinarizer
+
+test_prefixes: [
+  "少女音#我好想你",
+  "少女音#匆匆那年",
+  "少女音#他不爱我",
+  "少女音#纪念",
+  "世纪之光#我要你",
+  "世纪之光#时间都去哪儿了",
+  "tomake#夜上海",
+  "tomake#兰花草"
+]
+test_ids: []
+
+audio_sample_rate: 48000
+hop_size: 256
+win_size: 1024
+fft_size: 1024
+fmax: 24000
+fmin: 20
+max_frames: 3000
+
+num_spk: 20
+use_spk_id: true
+use_spk_emb: false
+
+use_pitch_embed: true
+f0_gen: diff
+param_: eps
+
+dur_loss: mse
+lambda_word_dur: 0
+
+vocoder: HifiGAN_NSF
+vocoder_ckpt: checkpoints/hifigan
+use_nsf: true
+
+gaussian_start: True
+f0_dilation_cycle_length: 4  # *
+predictor_layers: 5
+diff_loss_type: l1
+diff_decoder_type: 'wavenet'
+schedule_type: 'linear'
+f0_max_beta: 0.06
+f0_residual_layers: 10
+f0_residual_channels: 192
+optimizer_adam_beta1: 0.9
+optimizer_adam_beta2: 0.98
+weight_decay: 0
+keep_bins: 80
+f0_timesteps: 100
+f0_K_step: 100
+f0_infer_with_ref: false
+
+pitch_extractor: dio

@@ -1,0 +1,54 @@
+base_config:
+  - ./base.yaml
+  - ./te.yaml
+
+# 开始进行负采样的测试，且数据更新到 huawei-0310
+
+processed_data_dir: data/processed/
+binary_data_dir: data/binary/
+
+binarization_args:
+  with_wav: true
+  with_mel: false
+  with_breathiness: true
+  with_energy: true
+  with_zcr: true
+
+task_cls: research.singtech.te_task2.TETask2
+
+test_prefixes: [
+  "华为女声#第一周#假声#单身情歌",
+  "华为女声#第一周#力度#单身情歌",
+  "华为女声#第一周#气泡音#单身情歌",
+  "华为女声#第一周#气声#单身情歌",
+  "华为女声#第三周#假声#岁月神偷",
+  "华为女声#第三周#力度#岁月神偷",
+  "华为女声#第三周#气泡音#岁月神偷",
+  "华为女声#第三周#气声#岁月神偷",
+  "华为男声#第一周#假声#不能说的秘密",
+  "华为男声#第一周#力度#爱情转移",
+  "华为男声#第一周#气泡音#安河桥",
+  "华为男声#第一周#气声#暗香",
+  "华为男声#第二周#假声#魔鬼中的天使",
+  "华为男声#第二周#力度#魔鬼中的天使",
+  "华为男声#第二周#气泡音#魔鬼中的天使"
+]
+
+updown_rates: 2-2-2
+channel_multiples: 1-1-1
+
+apply_neg_sampling: true
+apply_tech_group_loss: true
+
+lambda_tech: 1.0
+lambdas_tech: ''
+lambda_tech_focal: 3.0
+
+use_breathiness: false
+breathiness_add_noise: gaussian:0.04
+use_energy: false
+energy_add_noise: gaussian:0.04
+use_zcr: false
+zcr_add_noise: gaussian:0.01
+frames_multiple: 8
+

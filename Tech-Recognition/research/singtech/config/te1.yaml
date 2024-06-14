@@ -1,0 +1,24 @@
+base_config:
+  - ./base.yaml
+  - ./te.yaml
+
+processed_data_dir: data/processed/huawei-0307
+binary_data_dir: data/binary/huawei-0307
+
+binarization_args:
+  with_wav: true
+  with_mel: false
+  with_breathiness: true
+  with_energy: true
+  with_zcr: true
+
+lambda_tech: 1.0
+lambdas_tech: ''
+lambda_tech_focal: 3.0
+
+use_breathiness: true
+breathiness_add_noise: gaussian:0.04
+use_energy: true
+energy_add_noise: gaussian:0.04
+use_zcr: true
+zcr_add_noise: gaussian:0.01
