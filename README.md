@@ -132,7 +132,7 @@ The code for our benchmarks for [Technique Controllable Singing Voice Synthesis]
 
 ## Technique Recognition
 
-The code for our benchmarks for [Technique Recognition](./Technique-Recognition/readme.md).
+The code for our benchmarks for [Technique Recognition](./Tech-Recognition/readme.md).
 
 ## Style Transfer
 
