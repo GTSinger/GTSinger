@@ -12,7 +12,7 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 
 Click [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-blue?label=Dataset)](https://huggingface.co/datasets/GTSinger/GTSinger) to access our dataset (audio along with TextGrid, json, musicxml) on Hugging Face **for free**! Hope our data is helpful for your research.
 
-Besides, we also provide our raw data on [Google Drive](https://drive.google.com/drive/folders/1vYtq_b7-rdBB4nIkzpfiTb6zFJJhgOP_?usp=drive_link).
+Besides, we also provide our dataset on [Google Drive](https://drive.google.com/drive/folders/1xcdvCxNAEEfJElt7sEP-xT8dMKxn1_Lz?usp=drive_link) and raw data on [Raw Data](https://drive.google.com/drive/folders/1vYtq_b7-rdBB4nIkzpfiTb6zFJJhgOP_?usp=drive_link).
 
 **Please note that, if you are using GTSinger, it means that you have accepted the terms of [license](https://github.com/GTSinger/GTSinger/blob/master/dataset_license.md).**
 
