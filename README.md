@@ -126,6 +126,8 @@ The code for preprocessing the dataset is provided in `./Data-Process/data_prepr
 
 - `seg_singing.py` & `seg_speech.py`: Segment the singing voice and speech based on the TextGrid file.
 
+- `gen_xml.py` : For the generation and processing of xml.
+
 ## Technique Controllable Singing Voice Synthesis
 
 The code for our benchmarks for [Technique Controllable Singing Voice Synthesis](./Technique-Controllable%20SVS/readme.md).
