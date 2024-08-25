@@ -17,7 +17,7 @@ binary_data_dir: 'data/binary/style'
 test_input_dir: ''
 
 # choices of models
-emo: true
+emo: false
 save_f0: true
 f0_gen: 'gmdiff'
 decoder: 'diffsinger'
