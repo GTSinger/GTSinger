@@ -99,17 +99,9 @@ class StyleSinger(FastSpeech2):
 
         # build f0 predictor
         if hparams["f0_gen"] == "gmdiff":
-            self.gm_diffnet = DDiffNet(in_dims=1, num_classes=2)
-            self.f0_gen = GaussianMultinomialDiffusion(num_classes=2, denoise_fn=self.gm_diffnet, num_timesteps=hparams["f0_timesteps"])
-
             self.gm_diffnet_inpainte = DDiffNet(in_dims=1, num_classes=2)
             self.f0_gen_inpainte = GaussianMultinomialDiffusion(num_classes=2, denoise_fn=self.gm_diffnet_inpainte, num_timesteps=hparams["f0_timesteps"])
         elif hparams["f0_gen"] == "conv":
-            self.pitch_predictor = PitchPredictor(
-                self.hidden_size, n_chans=self.hidden_size,
-                n_layers=5, dropout_rate=0.1, odim=2,
-                padding=hparams['ffn_padding'], kernel_size=hparams['predictor_kernel'])
-
             self.pitch_inpainter_predictor = PitchPredictor(
                 self.hidden_size, n_chans=self.hidden_size,
                 n_layers=5, dropout_rate=0.1, odim=2,
@@ -199,16 +191,15 @@ class StyleSinger(FastSpeech2):
         midi_notes = None
         if infer:
             midi_notes = expand_states(note[:, :, None], mel2ph)
-        pitch_inp_domain_agnostic = decoder_inp * tgt_nonpadding
         pitch_inp_domain_specific = (decoder_inp + spk_embed)
         if hparams['emo']:
             pitch_inp_domain_specific +=emo_embed
         if hparams['style']:
             pitch_inp_domain_specific +=style
         if hparams['tech']:
-            pitch_inp_domain_agnostic+=tech
+            pitch_inp_domain_specific+=tech
         pitch_inp_domain_specific *= tgt_nonpadding
-        predicted_pitch = self.inpaint_pitch(pitch_inp_domain_agnostic, pitch_inp_domain_specific, f0, uv, mel2ph, ret, encoder_out, midi_notes=midi_notes)
+        predicted_pitch = self.inpaint_pitch( pitch_inp_domain_specific, f0, uv, mel2ph, ret, encoder_out, midi_notes=midi_notes)
 
         # decode
         decoder_inp = decoder_inp + spk_embed + predicted_pitch 
@@ -261,21 +252,18 @@ class StyleSinger(FastSpeech2):
         ret['gloss'] = guided_loss
         return output.transpose(0, 1)
 
-    def inpaint_pitch(self, pitch_inp_domain_agnostic, pitch_inp_domain_specific, f0, uv, mel2ph, ret, encoder_out=None, **kwargs):
+    def inpaint_pitch(self, pitch_inp_domain_specific, f0, uv, mel2ph, ret, encoder_out=None, **kwargs):
         if hparams['pitch_type'] == 'frame':
             pitch_padding = mel2ph == 0
         if hparams['predictor_grad'] != 1:
-            pitch_inp_domain_agnostic = pitch_inp_domain_agnostic.detach() + hparams['predictor_grad'] * (pitch_inp_domain_agnostic - pitch_inp_domain_agnostic.detach())
             pitch_inp_domain_specific = pitch_inp_domain_specific.detach() + hparams['predictor_grad'] * (pitch_inp_domain_specific - pitch_inp_domain_specific.detach())
 
         if hparams["f0_gen"] == "gmdiff":
-            pitch_domain_agnostic = self.add_gmdiff_pitch(pitch_inp_domain_agnostic, f0, uv, mel2ph, ret, 0,**kwargs)
-            pitch_domain_specific = self.add_gmdiff_pitch(pitch_inp_domain_specific, f0, uv, mel2ph, ret, 1, **kwargs)
+            pitch_domain_specific = self.add_gmdiff_pitch(pitch_inp_domain_specific, f0, uv, mel2ph, ret, **kwargs)
         elif hparams["f0_gen"] == "conv":
-            pitch_domain_agnostic = self.pitch_predictor(pitch_inp_domain_agnostic)
             pitch_domain_specific = self.pitch_inpainter_predictor(pitch_inp_domain_specific)
 
-        pitch_pred = pitch_domain_specific/2+pitch_domain_agnostic/2
+        pitch_pred = pitch_domain_specific
         ret['pitch_pred'] = pitch_pred
 
         use_uv = hparams['pitch_type'] == 'frame' and hparams['use_uv']
@@ -295,7 +283,7 @@ class StyleSinger(FastSpeech2):
         pitch_embed = self.pitch_embed(pitch)
         return pitch_embed
 
-    def add_gmdiff_pitch(self, decoder_inp, f0, uv, mel2ph, ret, inpainter, encoder_out=None, **kwargs):
+    def add_gmdiff_pitch(self, decoder_inp, f0, uv, mel2ph, ret, encoder_out=None, **kwargs):
         pitch_padding = mel2ph == 0
         if f0 is None:
             infer = True
@@ -331,30 +319,20 @@ class StyleSinger(FastSpeech2):
             upper_norm_f0[upper_norm_f0 > 1] = 1
             lower_norm_f0[lower_norm_f0 < -1] = -1
             lower_norm_f0[lower_norm_f0 > 1] = 1
-            if inpainter == 0:
-                pitch_pred = self.f0_gen(decoder_inp.transpose(-1, -2), None, None, None, ret, infer, dyn_clip=[lower_norm_f0, upper_norm_f0]) # [lower_norm_f0, upper_norm_f0]
-                f0 = pitch_pred[:, :, 0]
-                uv = pitch_pred[:, :, 1]
-                uv[midi_notes[:, 0, :] == 0] = 1
-                f0 = minmax_denorm(f0)
-                ret["gdiff1"] = 0.0
-                ret["mdiff1"] = 0.0
-            else:
-                pitch_pred = self.f0_gen_inpainte(decoder_inp.transpose(-1, -2), None, None, None, ret, infer, dyn_clip=[lower_norm_f0, upper_norm_f0]) # [lower_norm_f0, upper_norm_f0]
-                f0 = pitch_pred[:, :, 0]
-                uv = pitch_pred[:, :, 1]
-                uv[midi_notes[:, 0, :] == 0] = 1
-                f0 = minmax_denorm(f0)
-                ret["gdiff2"] = 0.0
-                ret["mdiff2"] = 0.0
+            
+            pitch_pred = self.f0_gen_inpainte(decoder_inp.transpose(-1, -2), None, None, None, ret, infer, dyn_clip=[lower_norm_f0, upper_norm_f0]) # [lower_norm_f0, upper_norm_f0]
+            f0 = pitch_pred[:, :, 0]
+            uv = pitch_pred[:, :, 1]
+            uv[midi_notes[:, 0, :] == 0] = 1
+            f0 = minmax_denorm(f0)
+            ret["gdiff2"] = 0.0
+            ret["mdiff2"] = 0.0
 
         else:
             nonpadding = (mel2ph > 0).float()
             norm_f0 = minmax_norm(f0)
-            if inpainter == 0:
-                ret["mdiff1"], ret["gdiff1"], ret["nll1"] = self.f0_gen(decoder_inp.transpose(-1, -2), norm_f0.unsqueeze(dim=1), uv, nonpadding, ret, infer)
-            else:
-                ret["mdiff2"], ret["gdiff2"], ret["nll2"] = self.f0_gen_inpainte(decoder_inp.transpose(-1, -2), norm_f0.unsqueeze(dim=1), uv, nonpadding, ret, infer)
+
+            ret["mdiff2"], ret["gdiff2"], ret["nll2"] = self.f0_gen_inpainte(decoder_inp.transpose(-1, -2), norm_f0.unsqueeze(dim=1), uv, nonpadding, ret, infer)
 
         f0=f0[:,:,None]
         uv=uv[:,:,None]
