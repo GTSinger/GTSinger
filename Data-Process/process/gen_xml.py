@@ -243,8 +243,8 @@ def for_loop(data_dir, postfix):
             assert False, f"invalid postfix {postfix}"
 
 if __name__ == '__main__':
-    # for_loop("/data_disk/singing-data-preprocess-main/m+t检查1220", "TextGrid")
-    data_dir = "/Users/aaron/Downloads/华为数据/华为女声第一周"
+
+    data_dir = ""
     for_loop(data_dir, "musicxml")
     remove_list = []
     for musicxml in sorted(tqdm(glob.glob(f"{data_dir}/*/*/*/*/*_test.json"))):
