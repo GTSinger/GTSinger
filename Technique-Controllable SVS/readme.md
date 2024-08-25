@@ -24,10 +24,6 @@ CUDA_VISIBLE_DEVICES=$GPU python tasks/run.py --config egs/stylesinger.yaml  --e
 CUDA_VISIBLE_DEVICES=$GPU python tasks/run.py --config egs/stylesinger.yaml  --exp_name StyleSinger --infer
 ```
 
-### Using RMSSinger or DiffSinger
-
-Set `style`, `emo`, `umln`, and `decoder` in the [config](./egs/stylesinger.yaml).
-
 ## Acknowledgements
 
 This implementation uses parts of the code from the following Github repos:
