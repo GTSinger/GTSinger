@@ -12,6 +12,7 @@ from modules.commons.layers import Embedding
 from modules.commons.conv import ResidualBlock, ConvBlocks
 from modules.commons.conformer.conformer import ConformerLayers, FastConformerLayers
 from research.rme.modules.unet import Unet
+from research.singtech.modules.zipformer.zipformer import ZipformerLayers
 
 # gpu_tracker = MemTracker()
 
@@ -68,8 +69,30 @@ class TechExtractor(nn.Module):
                             updown_rates=updown_rates, channel_multiples=channel_multiples, dropout=0,
                             is_BTC=True, constant_channels=False, mid_net=mid_net,
                             use_skip_layer=hparams.get('unet_skip_layer', False),
+                            skip_scale=hparams.get('unet_skip_scale', 1.0), add_attention=True)
+           
+            
+        # zipformer
+        elif hparams.get('bkb_net', 'conv') == 'zipformer':
+            ds_rates = [int(i) for i in hparams.get('downsample_rates', None).split('-')]
+            num_encoder_layers = [int(i) for i in hparams.get('num_encoder_layers', None).split('-')]
+            encoder_dims = [hparams.get('encoder_dims', 256) for _ in range(len(ds_rates))]
+            attention_dims = [hparams.get('attention_dims', 256) for _ in range(len(ds_rates))]
+            feedforward_dim = [hparams.get('feedforward_dim', 256) for _ in range(len(ds_rates))]
+            self.net = ZipformerLayers(hidden_size, encoder_dims= encoder_dims, attention_dim= attention_dims,
+                                     zipformer_downsampling_factors= ds_rates, feedforward_dim= feedforward_dim,
+                                       num_encoder_layers= num_encoder_layers)
+        elif hparams.get('bkb_net', 'conv') == 'zipformer1':
+            mid_net = ZipformerLayers(hidden_size, encoder_dims= (256,256), attention_dim= (256,256),
+                 encoder_unmasked_dims= (256,256), zipformer_downsampling_factors= (2,2),
+                 nhead= (4,4), feedforward_dim= (256,256),
+                 num_encoder_layers= (2,2), dropout= 0.1,
+                 cnn_module_kernels= (9,9))
+            self.net = Unet(hidden_size, down_layers=len(updown_rates), up_layers=len(updown_rates), kernel_size=3,
+                            updown_rates=updown_rates, channel_multiples=channel_multiples, dropout=0,
+                            is_BTC=True, constant_channels=False, mid_net=mid_net,
+                            use_skip_layer=hparams.get('unet_skip_layer', False),
                             skip_scale=hparams.get('unet_skip_scale', 1.0))
-
         # tech prediction
         self.tech_attn_num_head = hparams.get('tech_attn_num_head', 1)
         self.multihead_dot_attn = nn.Linear(hidden_size, self.tech_attn_num_head)
@@ -104,14 +127,13 @@ class TechExtractor(nn.Module):
         variance_embed = variance_embed / np.sqrt(2)
 
         feat = self.cond_encoder(mel_embed + pitch_embed + variance_embed)
-
         feat = self.net(feat)   # [B, T, C]
-
         # note pitch prediction
         attn = torch.sigmoid(self.multihead_dot_attn(feat))     # [B, T, C] -> [B, T, num_head]
         attn = F.dropout(attn, self.dropout, train)
         attn_feat = feat.unsqueeze(3) * attn.unsqueeze(2)   # [B, T, C, 1] x [B, T, 1, num_head] -> [B, T, C, num_head]
         attn_feat = torch.mean(attn_feat, dim=-1)   # [B, T, C, num_head] -> [B, T, C]
+        
         mel2ph = torch.cumsum(ph_bd, 1)
         ph_length = torch.max(torch.sum(ph_bd, dim=1)).item() + 1  # [B]
         # print('note_length', note_length)
@@ -134,8 +156,6 @@ class TechExtractor(nn.Module):
         tech_pred = torch.sigmoid(tech_logits)  # [B, ph_length, note_num]
         tech_pred = (tech_pred > self.tech_threshold).long()     # [B, ph_length]
         ret['tech_pred'] = tech_pred
-
-        # gpu_tracker.track()
         return ret
 
     def reset_parameters(self):

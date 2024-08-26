@@ -1,6 +1,7 @@
 import os
 import math
 import gc
+from collections import defaultdict
 
 import librosa.feature
 import numpy as np
@@ -15,20 +16,7 @@ from utils.audio.pitch_utils import norm_interp_f0, denorm_f0, f0_to_coarse
 from utils.commons.signal import get_filter_1d, get_gaussian_kernel_1d, get_hann_kernel_1d, \
     get_triangle_kernel_1d, add_gaussian_noise
 
-def get_soft_label_filter(soft_label_func, win_size, hparams):
-    # win_size: ms
-    win_size = round(int(win_size) * hparams['audio_sample_rate'] / 1000 / hparams['hop_size'])
-    win_size = win_size if win_size % 2 == 1 else win_size + 1  # ensure odd number
-    if soft_label_func == 'gaussian':
-        sigma = win_size / 3 / 2  # 3sigma range
-        kernel = get_gaussian_kernel_1d(win_size, sigma)
-        kernel = kernel / kernel.max()  # make sure the middle is 1
-    elif soft_label_func == 'hann':
-        kernel = get_hann_kernel_1d(win_size, periodic=False)
-    elif soft_label_func == 'triangle':
-        kernel = get_triangle_kernel_1d(win_size)
-    soft_filter = get_filter_1d(kernel, win_size, channels=1)
-    return soft_filter
+techgroup2lbl = {'Breathy':0, 'Pharyngeal':1, 'Vibrato':2, 'Glissando':3, 'Mixed_Voice_and_Falsetto': 4}
 
 def add_plain_noise(x, type_and_std=None, random_std=True, x_min=None, x_max=None):
     if type_and_std in ['none', None]:
@@ -83,6 +71,68 @@ class TEDataset(BaseSpeechDataset):
         if items is None:
             self.sizes = [self.sizes[i] for i in self.avail_idxs]
 
+        # 正负扩大采样 (直接在getitem里的最开始搞就可以)
+        self.apply_neg_sampling = self.hparams.get('apply_neg_sampling', False) and self.prefix == 'train'
+        if self.apply_neg_sampling:
+            print('| Applying negative sampling.')
+            self.make_negative_pools()
+
+    def get_label(self, index):
+        return self.id2label[index]
+
+    def make_negative_pools(self):
+        item_names = []
+        self.idx2item_name = {}
+        item_name2idx = {}
+        item_name2class_name = {}
+        self.item_name2tech_id = {}
+        self.parallel_dict = {}
+        self.id2label = {}
+        temp_ds = IndexedDataset(f'{self.data_dir}/{self.prefix}')
+        print(f'| Iterating training sets to build negative sampling pools')
+        for idx in tqdm(range(len(self)), total=len(self)):
+            item = temp_ds[self.avail_idxs[idx]]
+            frames = item['len']
+            item_name = item['item_name']
+            self.idx2item_name[idx] = item_name
+            item_name2idx[item_name] = idx
+            item_names.append(item_name)
+            lan, spk, tech_group, song_name, tech_name, sen_id = item_name.split('#') 
+            class_name = '#'.join([spk, tech_group, song_name])
+            self.id2label[idx] = techgroup2lbl[tech_group]
+            item_name2class_name[item_name] = class_name
+            is_neg = 'Control_Group' in item_name
+            if class_name not in self.parallel_dict:
+                if is_neg:
+                    self.parallel_dict[class_name] = {'pos': [], 'neg': [(idx, frames)]}
+                else:
+                    self.parallel_dict[class_name] = {'pos': [(idx, frames)], 'neg': []}
+            else:
+                if is_neg:
+                    self.parallel_dict[class_name]['neg'].append((idx, frames))
+                else:
+                    self.parallel_dict[class_name]['pos'].append((idx, frames))
+                    
+            self.item_name2tech_id[item_name] = None
+            if tech_group == 'Mixed_Voice_and_Falsetto':
+                self.item_name2tech_id[item_name] = [4, 5]
+            elif tech_group == 'Breathy':
+                self.item_name2tech_id[item_name] = 0
+            elif tech_group == 'Pharyngeal':
+                self.item_name2tech_id[item_name] = 1
+            elif tech_group == 'Vibrato':
+                self.item_name2tech_id[item_name] = 2
+            elif tech_group == 'Glissando':
+                self.item_name2tech_id[item_name] = 3
+        self.idx2negative_idxs = {}
+        for item_name in item_names:
+            idx = item_name2idx[item_name]
+            class_name = item_name2class_name[item_name]
+            if idx in self.parallel_dict[class_name]['pos']:
+                self.idx2negative_idxs[idx] = self.parallel_dict[class_name]['neg']
+            else:
+                self.idx2negative_idxs[idx] = self.parallel_dict[class_name]['pos']
+
     def add_noise(self, clean_wav):
         if self.noise_ds is None:   # each instance in multiprocessing must create unique ds object
             self.noise_ds = IndexedDataset(f"{self.hparams['noise_data_dir']}/{self.prefix}")
@@ -136,7 +186,24 @@ class TEDataset(BaseSpeechDataset):
         hparams = self.hparams
         item = self._get_item(index)
 
+        # find negative sample
+        other_item = None
+        other_index = None
+        if self.apply_neg_sampling and self.prefix == 'train':
+            negative_idxs = self.idx2negative_idxs[index]
+            idxs_ = np.arange(len(negative_idxs))
+            np.random.shuffle(idxs_)
+            for idx_ in idxs_:
+                if math.ceil((self.sizes[index] + negative_idxs[idx_][1]) / hparams['frames_multiple']) * hparams['frames_multiple'] < hparams['max_frames']:
+                    other_item = self._get_item(negative_idxs[idx_][0])
+                    other_index = negative_idxs[idx_][0]
+                    break
+
         wav = item['wav']
+        if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+            other_wav = other_item['wav']
+            wav = np.concatenate((wav, other_wav))
+
         noise_added = np.random.rand() < hparams.get('noise_prob', 0.8)
         if self.prefix == 'test' and not hparams.get('noise_in_test', False):
             noise_added = False
@@ -144,12 +211,33 @@ class TEDataset(BaseSpeechDataset):
             wav = self.add_noise(wav)
             # print('noise added!')
         mel = TEDataset.process_mel(wav, self.hparams)
-        assert len(mel) == self.sizes[index], (len(mel), self.sizes[index])
+        if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+            assert len(mel) in np.arange(self.sizes[index] + self.sizes[other_index] - 2, self.sizes[index] + self.sizes[other_index] + 3), \
+                (len(mel), self.sizes[index], self.sizes[other_index])
+        else:
+            assert len(mel) == self.sizes[index], (len(mel), self.sizes[index], index)
         max_frames = hparams['max_frames']
-        mel2ph_len = sum((item["mel2ph"] > 0).astype(int))
-        T = min(item['len'], mel2ph_len, len(item['f0']))
+
+        mel2ph = item['mel2ph']
+        if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+            if mel2ph[-1] == 0:
+                for i in range(len(mel2ph)-1, 0, -1):
+                    if mel2ph[i] > 0:
+                        mel2ph[i:] = mel2ph[i]  # eliminate rear 0s
+                        break
+            last_idx = mel2ph[-1]
+            other_mel2ph = other_item['mel2ph']
+            other_mel2ph[other_mel2ph > 0] = other_mel2ph[other_mel2ph > 0] + last_idx
+            mel2ph = np.concatenate((mel2ph, other_mel2ph))
+
+        mel2ph_len = sum((mel2ph > 0).astype(int))
+        if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+            T = min(item['len'] + other_item['len'], mel2ph_len, len(item['f0']) + len(other_item['f0']))
+        else:
+            T = min(item['len'], mel2ph_len, len(item['f0']))
         real_len = T
         T = math.ceil(min(T, max_frames) / hparams['frames_multiple']) * hparams['frames_multiple']
+
         spec = torch.Tensor(mel)[:max_frames]
         spec = pad_or_cut_xd(spec, T, dim=0)
         if 5 < hparams.get('use_mel_bins', hparams['audio_num_mel_bins']) < hparams['audio_num_mel_bins']:
@@ -157,19 +245,19 @@ class TEDataset(BaseSpeechDataset):
         sample = {
             "id": index,
             "item_name": item['item_name'],
+            "ph": item.get('ph', ""),
             "mel": spec,
             "mel_nonpadding": spec.abs().sum(-1) > 0,
         }
-        if hparams['use_spk_embed']:
-            sample["spk_embed"] = torch.Tensor(item['spk_embed'])
-        if hparams['use_spk_id']:
-            sample["spk_id"] = int(item['spk_id'])
+        if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+            sample['item_name'] = (item['item_name'], other_item['item_name'])
         if noise_added and self.prefix in ['train', 'valid']:
             noisy_mel = add_plain_noise(sample['mel'], type_and_std=hparams.get('mel_add_noise', 'none'))
             sample['mel'] = torch.clamp(noisy_mel, hparams['mel_vmin'], hparams['mel_vmax'])
-        sample['mel2ph'] = mel2ph = pad_or_cut_xd(torch.LongTensor(item['mel2ph']), T, 0)
-        sample["mel2word"] = mel2word = pad_or_cut_xd(torch.LongTensor(item.get("mel2word")), T, 0)
+        sample['mel2ph'] = mel2ph = pad_or_cut_xd(torch.LongTensor(mel2ph), T, 0)
+        # sample["mel2word"] = mel2word = pad_or_cut_xd(torch.LongTensor(item.get("mel2word")), T, 0)
         sample['mel_nonpadding'] = pad_or_cut_xd(sample['mel_nonpadding'].float(), T, 0)
+
         ph_bd = torch.zeros_like(mel2ph)
         for idx in range(1, T):
             if mel2ph[idx] == 0:
@@ -180,8 +268,11 @@ class TEDataset(BaseSpeechDataset):
 
         if hparams['use_pitch_embed']:
             assert 'f0' in item
-            # pitch = torch.LongTensor(item.get(hparams.get('pitch_key', 'pitch')))[:T]
-            f0, uv = norm_interp_f0(item["f0"][:T])
+            if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+                f0 = np.concatenate((item['f0'], other_item['f0']))
+                f0, uv = norm_interp_f0(f0[:T])
+            else:
+                f0, uv = norm_interp_f0(item["f0"][:T])
             # 给 f0 加噪
             if noise_added and self.prefix in ['train', 'valid']:
                 f0 = torch.FloatTensor(f0)
@@ -192,9 +283,13 @@ class TEDataset(BaseSpeechDataset):
         else:
             f0, uv, pitch, pitch_coarse = None, None, None, None
         sample["f0"], sample["uv"], sample["pitch_coarse"] = f0, uv, pitch_coarse
-
+        # print(item.keys())
         if hparams.get('use_breathiness', False):
-            breathiness = torch.FloatTensor(item['breathiness'])
+            if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+                breathiness = np.concatenate((item['breathiness'], other_item['breathiness']))
+                breathiness = torch.FloatTensor(breathiness)
+            else:
+                breathiness = torch.FloatTensor(item['breathiness'])
             if noise_added and self.prefix in ['train', 'valid']:
                 breathiness = add_plain_noise(breathiness, type_and_std=hparams.get('breathiness_add_noise', 'none'), x_min=0, x_max=0.8)
             breathiness_coarse = energy_to_coarse(breathiness)
@@ -202,7 +297,11 @@ class TEDataset(BaseSpeechDataset):
             sample['breathiness'] = breathiness_coarse
 
         if hparams.get('use_energy', False):
-            energy = torch.FloatTensor(item['energy'])
+            if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+                energy = np.concatenate((item['energy'], other_item['energy']))
+                energy = torch.FloatTensor(energy)
+            else:
+                energy = torch.FloatTensor(item['energy'])
             if noise_added and self.prefix in ['train', 'valid']:
                 energy = add_plain_noise(energy, type_and_std=hparams.get('energy_add_noise', 'none'), x_min=0, x_max=0.8)
             energy_coarse = energy_to_coarse(energy)
@@ -210,22 +309,41 @@ class TEDataset(BaseSpeechDataset):
             sample['energy'] = energy_coarse
 
         if hparams.get('use_zcr', False):
-            zcr = torch.FloatTensor(item['zcr'])
+            if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+                zcr = np.concatenate((item['zcr'], other_item['zcr']))
+                zcr = torch.FloatTensor(zcr)
+            else:
+                zcr = torch.FloatTensor(item['zcr'])
             if noise_added and self.prefix in ['train', 'valid']:
                 zcr = add_plain_noise(zcr, type_and_std=hparams.get('zcr_add_noise', 'none'), x_min=0, x_max=1)
             zcr_coarse = anything_to_coarse(zcr, bins=256, x_max=1.0, x_min=0.0, pad=0)
             zcr_coarse = pad_or_cut_xd(zcr_coarse, T, 0)
             sample['zcr'] = zcr_coarse
+       
+        if self.apply_neg_sampling and self.prefix == 'train':
+            sample['tech_id'] = self.item_name2tech_id[item['item_name']]   # 直接全上 list
 
-        # make tech matrix
-        mix_tech = torch.LongTensor(item['mix_tech'])
-        falsetto_tech = torch.LongTensor(item['falsetto_tech'])
-        breathy_tech = torch.LongTensor(item['breathy_tech'])
-        pharyngeal_tech = torch.LongTensor(item['pharyngeal_tech'])
-        vibrato_tech = torch.LongTensor(item['vibra_tech'])
-        glissando_tech = torch.LongTensor(item['glissando_tech'])
-        tech_matrix = torch.stack((mix_tech, falsetto_tech, breathy_tech, pharyngeal_tech, vibrato_tech, glissando_tech), dim=1)
-        sample['tech'] = tech_matrix    # [T, C]
+        if hparams.get('have_tech_gt', True):
+            if self.apply_neg_sampling and other_item is not None and self.prefix == 'train':
+                mix_tech = torch.LongTensor(item['mix_tech'] + other_item['mix_tech'])
+                falsetto_tech = torch.LongTensor(item['falsetto_tech'] + other_item['falsetto_tech'])
+                breathe_tech = torch.LongTensor(item['breathy_tech'] + other_item['breathy_tech'])
+                pharyngeal_tech = torch.LongTensor(item['pharyngeal_tech'] + other_item['pharyngeal_tech'])
+                vibrato_tech = torch.LongTensor(item['vibrato_tech'] + other_item['vibrato_tech'])
+                glissando_tech = torch.LongTensor(item['glissando_tech'] + other_item['glissando_tech'])
+               
+            else:
+                mix_tech = torch.LongTensor(item['mix_tech'])
+                falsetto_tech = torch.LongTensor(item['falsetto_tech'])
+                breathe_tech = torch.LongTensor(item['breathy_tech'])
+                pharyngeal_tech = torch.LongTensor(item['pharyngeal_tech'])
+                vibrato_tech = torch.LongTensor(item['vibrato_tech'])
+                glissando_tech = torch.LongTensor(item['glissando_tech'])
+                
+            tech_matrix = torch.stack((breathe_tech, pharyngeal_tech, vibrato_tech, glissando_tech, mix_tech, falsetto_tech), dim=1)
+            sample['tech'] = tech_matrix    # [T, C]
+        else:
+            sample['tech'] = None
 
         # delete big redundancy
         if not hparams.get('use_mel', True) and 'mel' in sample:
@@ -243,7 +361,7 @@ class TEDataset(BaseSpeechDataset):
         hparams = self.hparams
         id = torch.LongTensor([s['id'] for s in samples])
         item_names = [s['item_name'] for s in samples]
-        # text = [s['text'] for s in samples]
+        ph = [s['ph'] for s in samples]
         mels = collate_1d_or_2d([s['mel'] for s in samples], 0.0) if 'mel' in samples[0] else None
         mel_lengths = torch.LongTensor([s['mel'].shape[0] for s in samples]) if 'mel' in samples[0] else 0
         mel_nonpadding = collate_1d_or_2d([s['mel_nonpadding'] for s in samples], 0.0) if 'mel_nonpadding' in samples[0] else None
@@ -252,6 +370,7 @@ class TEDataset(BaseSpeechDataset):
             'id': id,
             'item_name': item_names,
             'nsamples': len(samples),
+            'ph': ph,
             'mels': mels,
             'mel_lengths': mel_lengths,
             'mel_nonpadding': mel_nonpadding
@@ -276,8 +395,11 @@ class TEDataset(BaseSpeechDataset):
         batch["wav"] = collate_1d_or_2d([s['wav'] for s in samples], 0.0) if 'wav' in samples[0] else None
 
         batch["ph_bd"] = collate_1d_or_2d([s['ph_bd'] for s in samples], 0.0)
-        batch['mel2word'] = collate_1d_or_2d([s['mel2word'] for s in samples], 0)
-        batch['techs'] = collate_1d_or_2d([s['tech'] for s in samples], 0)
+        batch['mel2word'] = collate_1d_or_2d([s['mel2word'] for s in samples], 0) if 'mel2word' in samples[0] else None
+
+        if hparams.get('have_tech_gt', True):
+            batch['techs'] = collate_1d_or_2d([s['tech'] for s in samples], 0)
+            batch['tech_ids'] = [s['tech_id'] for s in samples] if 'tech_id' in samples[0] else None
 
         batch['breathiness'] = collate_1d_or_2d([s['breathiness'] for s in samples], 0) if 'breathiness' in samples[0] else None
         batch['energy'] = collate_1d_or_2d([s['energy'] for s in samples], 0) if 'energy' in samples[0] else None
@@ -290,95 +412,3 @@ class TEDataset(BaseSpeechDataset):
         if self.prefix == 'train':
             return int(os.getenv('NUM_WORKERS', self.hparams['ds_workers']))
         return 1
-
-# TODO:
-def make_mix_batch(ph_lst, mel2ph_lst, seg_keys=('breathe', '_NONE')):
-    # 这个没有对 spk 进行规约
-    src_bsz = len(ph_lst)
-
-    seg_pool = []
-    seg_idxs = []
-    for item_idx in range(src_bsz):
-        ph = ph_lst[item_idx]
-        mel2ph = mel2ph_lst[item_idx]
-        last_mel2ph_idx = 0
-        last_ph_idx = 0
-        for ph_idx in range(1, len(ph)-1):
-            p = ph[ph_idx]
-            if p in seg_keys:
-                for mel2ph_idx in range(last_mel2ph_idx, len(mel2ph)):
-                    if mel2ph[mel2ph_idx] - 1 == ph_idx:
-                        seg_pool.append([item_idx, last_mel2ph_idx, mel2ph_idx, last_ph_idx, ph_idx, mel2ph_idx - last_mel2ph_idx])
-                        last_mel2ph_idx = mel2ph_idx
-                        break
-                last_ph_idx = ph_idx
-        seg_pool.append([item_idx, last_mel2ph_idx, len(mel2ph), last_ph_idx, len(ph), len(mel2ph) - last_mel2ph_idx])
-
-
-class TEMixDataset(TEDataset):
-    """
-    对 batch 进行 intra-batch mixing
-    intra-batch mixing 貌似就不能使用 musan noise 了，不过反正都可以试试
-    """
-    def __getitem__(self, index):
-        sample = super(TEMixDataset, self).__getitem__(index)
-        item = self._get_item(index)
-        sample['ph'] = item['ph']
-
-    def collater(self, samples):
-        if self.prefix != 'train':
-            return super(TEMixDataset, self).collater(samples)
-        else:
-            if len(samples) == 0:
-                return {}
-            hparams = self.hparams
-            id = torch.LongTensor([s['id'] for s in samples])
-            item_names = [s['item_name'] for s in samples]
-
-            batch = {}
-
-            ph_lst = [s['ph'] for s in samples]
-            mel2ph_lst = [s['mel2ph'] for s in samples]
-
-
-            mels = collate_1d_or_2d([s['mel'] for s in samples], 0.0) if 'mel' in samples[0] else None
-            mel_lengths = torch.LongTensor([s['mel'].shape[0] for s in samples]) if 'mel' in samples[0] else 0
-            mel_nonpadding = collate_1d_or_2d([s['mel_nonpadding'] for s in samples], 0.0) if 'mel_nonpadding' in samples[0] else None
-
-            batch = {
-                'id': id,
-                'item_name': item_names,
-                'nsamples': len(samples),
-                'mels': mels,
-                'mel_lengths': mel_lengths,
-                'mel_nonpadding': mel_nonpadding
-            }
-
-            if hparams['use_spk_embed']:
-                spk_embed = torch.stack([s['spk_embed'] for s in samples])
-                batch['spk_embed'] = spk_embed
-            if hparams['use_spk_id']:
-                spk_ids = torch.LongTensor([s['spk_id'] for s in samples])
-                batch['spk_ids'] = spk_ids
-
-            if hparams['use_pitch_embed']:
-                f0 = collate_1d_or_2d([s['f0'] for s in samples], 0.0)
-                # pitch = collate_1d_or_2d([s['pitch'] for s in samples])
-                uv = collate_1d_or_2d([s['uv'] for s in samples])
-                pitch_coarse = collate_1d_or_2d([s['pitch_coarse'] for s in samples])
-            else:
-                f0, uv, pitch, pitch_coarse = None, None, None, None
-            batch['mel2ph'] = collate_1d_or_2d([s['mel2ph'] for s in samples], 0.0)
-            batch['f0'], batch['uv'], batch['pitch_coarse'] = f0, uv, pitch_coarse
-            batch["wav"] = collate_1d_or_2d([s['wav'] for s in samples], 0.0) if 'wav' in samples[0] else None
-
-            batch["ph_bd"] = collate_1d_or_2d([s['ph_bd'] for s in samples], 0.0)
-            batch['mel2word'] = collate_1d_or_2d([s['mel2word'] for s in samples], 0)
-            batch['techs'] = collate_1d_or_2d([s['tech'] for s in samples], 0)
-
-            batch['breathiness'] = collate_1d_or_2d([s['breathiness'] for s in samples], 0)
-            batch['energy'] = collate_1d_or_2d([s['energy'] for s in samples], 0)
-            batch['zcr'] = collate_1d_or_2d([s['zcr'] for s in samples], 0)
-
-            return batch
-

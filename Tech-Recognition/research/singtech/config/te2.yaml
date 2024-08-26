@@ -2,10 +2,12 @@ base_config:
   - ./base.yaml
   - ./te.yaml
 
-# 开始进行负采样的测试，且数据更新到 huawei-0310
-
-processed_data_dir: data/processed/
-binary_data_dir: data/binary/
+raw_data_dir: 'data/raw/gtsinger'
+processed_data_dir: data/processed/gtsinger
+binary_data_dir: data/binary/gtsinger
+ds_names: huawei02
+ds_workers: 4
+max_sentences: 16
 
 binarization_args:
   with_wav: true
@@ -14,35 +16,53 @@ binarization_args:
   with_energy: true
   with_zcr: true
 
-task_cls: research.singtech.te_task2.TETask2
+task_cls: research.singtech.te_task.TETask
 
 test_prefixes: [
-  "华为女声#第一周#假声#单身情歌",
-  "华为女声#第一周#力度#单身情歌",
-  "华为女声#第一周#气泡音#单身情歌",
-  "华为女声#第一周#气声#单身情歌",
-  "华为女声#第三周#假声#岁月神偷",
-  "华为女声#第三周#力度#岁月神偷",
-  "华为女声#第三周#气泡音#岁月神偷",
-  "华为女声#第三周#气声#岁月神偷",
-  "华为男声#第一周#假声#不能说的秘密",
-  "华为男声#第一周#力度#爱情转移",
-  "华为男声#第一周#气泡音#安河桥",
-  "华为男声#第一周#气声#暗香",
-  "华为男声#第二周#假声#魔鬼中的天使",
-  "华为男声#第二周#力度#魔鬼中的天使",
-  "华为男声#第二周#气泡音#魔鬼中的天使"
+    "Chinese#ZH-Alto-1#Breathy#不再见",
+  "Chinese#ZH-Tenor-1#Breathy#不染",
+  "Chinese#ZH-Tenor-1#Pharyngeal#不为谁而作的歌",
+  "Chinese#ZH-Alto-1#Pharyngeal#不为谁而作的歌",
+  "Chinese#ZH-Alto-1#Vibrato#不再见",
+  "Chinese#ZH-Tenor-1#Vibrato#从前慢",
+  "Chinese#ZH-Tenor-1#Glissando#不染",
+  "Chinese#ZH-Alto-1#Glissando#传奇",
+  "Chinese#ZH-Alto-1#Mixed_Voice_and_Falsetto#一次就好",
+  "Chinese#ZH-Tenor-1#Mixed_Voice_and_Falsetto#一次就好",
+
+  "English#EN-Alto-1#Breathy#all is found",
+  "English#EN-Alto-1#Pharyngeal#beauty and the beast",
+  "English#EN-Alto-2#Vibrato#A Thousand Years",
+  "English#EN-Alto-2#Glissando#A Thousand Years",
+  "English#EN-Alto-2#Mixed_Voice_and_Falsetto#A Thousand Years",
+  "English#EN-Alto-2#Mixed_Voice_and_Falsetto#All of Me",
+
+  # "Spanish#ES-Bass-1#Mixed_Voice_and_Falsetto#Aire",
+  # "German#DE-Tenor-1#Mixed_Voice_and_Falsetto#An die Laute",
+  # "French#FR-Tenor-1#Mixed_Voice_and_Falsetto#Le Toréador",
+  # "Russian#RU-Alto-1#Mixed_Voice_and_Falsetto#Аня Облонская",
+  # "Japanese#JA-Tenor-1#Mixed_Voice_and_Falsetto#Heartful song",
+  # "Korean#KO-Soprano-1#Mixed_Voice_and_Falsetto#all with you",
+  # "Italian#IT-Bass-1#Mixed_Voice_and_Falsetto#Gioia dell'amore"
 ]
 
-updown_rates: 2-2-2
-channel_multiples: 1-1-1
+bkb_net: zipformer
+encoder_dims: 256
+attention_dims: 256
+feedforward_dim: 256
+num_encoder_layers: 2-2-2
+downsample_rates: 2-4-2
+
 
 apply_neg_sampling: true
 apply_tech_group_loss: true
+apply_weighted_sampler: true
 
 lambda_tech: 1.0
 lambdas_tech: ''
 lambda_tech_focal: 3.0
+
+noise_prob: 0.0
 
 use_breathiness: false
 breathiness_add_noise: gaussian:0.04
@@ -51,4 +71,7 @@ energy_add_noise: gaussian:0.04
 use_zcr: false
 zcr_add_noise: gaussian:0.01
 frames_multiple: 8
+loud_norm: true
 
+lr: 0.00001
+val_check_interval: 2000

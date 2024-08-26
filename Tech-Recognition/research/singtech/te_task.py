@@ -1,18 +1,23 @@
 import os
 import sys
 import traceback
+import warnings
+import types
 
 import numpy as np
 import torch
 import torch.nn.functional as F
+import torch.distributed as dist
 from torchmetrics.functional.classification import binary_auroc, binary_recall, binary_f1_score, binary_precision, binary_accuracy
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import mir_eval
 import pretty_midi
 import glob
-import warnings
+import filecmp
+import pandas as pd
 
+import utils
 from utils import seed_everything
 from utils.commons.hparams import hparams
 from tasks.tts.tts_utils import parse_dataset_configs
@@ -24,6 +29,7 @@ from utils.commons.tensor_utils import tensors_to_scalars
 from utils.commons.ckpt_utils import load_ckpt
 from utils.nn.model_utils import print_arch
 from utils.commons.multiprocess_utils import MultiprocessManager
+from utils.commons.dataset_utils import data_loader, BaseConcatDataset
 from utils.audio.pitch_utils import midi_onset_eval, midi_offset_eval, midi_pitch_eval
 from utils.commons.multiprocess_utils import multiprocess_run_tqdm
 from utils.commons.losses import sigmoid_focal_loss
@@ -32,11 +38,13 @@ from utils.commons.losses import sigmoid_focal_loss
 from tasks.tts.speech_base import SpeechBaseTask
 from research.singtech.te_dataset import TEDataset
 from research.singtech.modules.te import TechExtractor
+# from research.singtech.modules.te_wn import TechExtractor as TechExtractorWN
 
 # plt.rcParams['font.sans-serif'] = ['SimHei']
 # plt.rcParams['axes.unicode_minus'] = False
 
 # gpu_tracker = MemTracker()
+
 
 def f0_to_figure(f0_gt, f0_cwt=None, f0_pred=None):
     fig = plt.figure(figsize=(12, 8))
@@ -51,6 +59,45 @@ def f0_to_figure(f0_gt, f0_cwt=None, f0_pred=None):
     plt.legend()
     return fig
 
+class ImbalancedDatasetSampler(torch.utils.data.sampler.Sampler):
+    """Samples elements randomly from a given list of indices for imbalanced dataset
+
+    Arguments:
+        indices: a list of indices
+        num_samples: number of samples to draw
+        callback_get_label: a callback-like function which takes two arguments - dataset and index
+    """
+
+    def __init__(self, dataset, labels=None, get_label_fn=None):
+        # if indices is not provided, all elements in the dataset will be considered
+        self.indices = list(range(len(dataset)))
+        # define custom callback
+        self.num_samples = len(self.indices)
+        self.get_label_fn = get_label_fn
+        # distribution of classes in the dataset
+        df = pd.DataFrame()
+        df["label"] = self._get_labels(dataset) if labels is None else labels
+        df.index = self.indices
+        df = df.sort_index()
+        label_to_count = df["label"].value_counts()
+        weights = 1.0 / label_to_count[df["label"]]
+        self.weights = torch.DoubleTensor(weights.to_list())
+
+    def _get_labels(self, dataset):
+        indices = dataset.ordered_indices()
+        if self.get_label_fn != None:
+            return [self.get_label_fn(id) for id in indices]
+        elif dataset.get_label != None:
+            return [dataset.get_label(id) for id in indices]
+        else:
+            raise NotImplementedError
+
+    def __iter__(self):
+        return (self.indices[i] for i in torch.multinomial(self.weights, self.num_samples, replacement=True))
+
+    def __len__(self):
+        return self.num_samples
+
 class TETask(SpeechBaseTask):
     def __init__(self, *args, **kwargs):
         super(SpeechBaseTask, self).__init__(*args, **kwargs)
@@ -64,6 +111,94 @@ class TETask(SpeechBaseTask):
 
         # UserWarning: No positive samples in targets, true positive value should be meaningless. Returning zero tensor in true positive score
         warnings.filterwarnings("ignore", category=UserWarning)
+
+    @data_loader
+    def train_dataloader(self):
+        if hparams['train_sets'] != '':
+            train_sets = hparams['train_sets'].split("|")
+            # check if all train_sets have the same spk map and dictionary
+            binary_data_dir = hparams['binary_data_dir']
+            file_to_cmp = ['phone_set.json']
+            if os.path.exists(f'{binary_data_dir}/word_set.json'):
+                file_to_cmp.append('word_set.json')
+            if hparams['use_spk_id']:
+                file_to_cmp.append('spk_map.json')
+            for f in file_to_cmp:
+                for ds_name in train_sets:
+                    base_file = os.path.join(binary_data_dir, f)
+                    ds_file = os.path.join(ds_name, f)
+                    assert filecmp.cmp(base_file, ds_file), \
+                        f'{f} in {ds_name} is not same with that in {binary_data_dir}.'
+            train_dataset = BaseConcatDataset([
+                self.dataset_cls(prefix='train', shuffle=True, data_dir=ds_name) for ds_name in train_sets])
+        else:
+            train_dataset = self.dataset_cls(prefix=hparams['train_set_name'], shuffle=True)
+
+        if hparams.get('apply_weighted_sampler', True):
+            print('| Applying weighted sampler.')
+            return self.build_dataloader(train_dataset, False, self.max_tokens, self.max_sentences, sample_by_weight=True,
+                                         endless=hparams['endless_ds'], pin_memory=hparams.get('pin_memory', False))
+        else:
+            return self.build_dataloader(train_dataset, True, self.max_tokens, self.max_sentences,
+                                     endless=hparams['endless_ds'], pin_memory=hparams.get('pin_memory', False))
+
+    def build_dataloader(self, dataset, shuffle, max_tokens=None, max_sentences=None, required_batch_size_multiple=-1,
+                         endless=False, batch_by_size=True, pin_memory=False, sample_by_weight=False, ):
+        devices_cnt = torch.cuda.device_count()
+        if devices_cnt == 0:
+            devices_cnt = 1
+        if required_batch_size_multiple == -1:
+            required_batch_size_multiple = devices_cnt
+
+        def shuffle_batches(batches):
+            np.random.shuffle(batches)
+            return batches
+
+        if max_tokens is not None:
+            max_tokens *= devices_cnt
+        if max_sentences is not None:
+            max_sentences *= devices_cnt
+        indices = dataset.ordered_indices()
+        sampler = None
+        if sample_by_weight:
+            sampler = ImbalancedDatasetSampler(dataset)
+
+        if batch_by_size:
+            batch_sampler = utils.commons.dataset_utils.batch_by_size(
+                indices, dataset.num_tokens, max_tokens=max_tokens, max_sentences=max_sentences,
+                required_batch_size_multiple=required_batch_size_multiple,
+            )
+        else:
+            batch_sampler = []
+            for i in range(0, len(indices), max_sentences):
+                batch_sampler.append(indices[i:i + max_sentences])
+
+        if shuffle:
+            batches = shuffle_batches(list(batch_sampler))
+            if endless:
+                batches = [b for _ in range(1000) for b in shuffle_batches(list(batch_sampler))]
+        else:
+            batches = batch_sampler
+            if endless:
+                batches = [b for _ in range(1000) for b in batches]
+        num_workers = dataset.num_workers
+        if self.trainer.use_ddp:
+            num_replicas = dist.get_world_size()
+            rank = dist.get_rank()
+            batches = [x[rank::num_replicas] for x in batches if len(x) % num_replicas == 0]
+        if sampler != None:
+            return torch.utils.data.DataLoader(dataset,
+                                               batch_size=max_sentences,
+                                               sampler=sampler,
+                                               collate_fn=dataset.collater,
+                                               num_workers=num_workers,
+                                               pin_memory=pin_memory)
+        else:
+            return torch.utils.data.DataLoader(dataset,
+                                               collate_fn=dataset.collater,
+                                               batch_sampler=batches,
+                                               num_workers=num_workers,
+                                               pin_memory=pin_memory)
 
     def build_model(self):
         self.build_tts_model()
@@ -83,7 +218,6 @@ class TETask(SpeechBaseTask):
         return total_loss, loss_output
 
     def run_model(self, sample, infer=False):
-        # gpu_tracker.track()
         mel = sample['mels']
         pitch_coarse = sample['pitch_coarse']
         uv = sample['uv'].long()
@@ -93,29 +227,42 @@ class TETask(SpeechBaseTask):
         energy = sample.get('energy', None)
         zcr = sample.get('zcr', None)
         variance = {'breathiness': breathiness, 'energy': energy, 'zcr': zcr}
-        techs = sample['techs']
 
         output = self.model(mel=mel, ph_bd=ph_bd, pitch=pitch_coarse, uv=uv, variance=variance,
                             non_padding=mel_nonpadding, train=not infer)
         losses = {}
         if not infer:
-            # try:
-            self.add_tech_loss(output['tech_logits'], techs, losses)
-            # except RuntimeError as err:
-            #     _, exc_value, exc_tb = sys.exc_info()
-            #     tb = traceback.extract_tb(exc_tb)[-1]
-            #     print(f'skip {sample["item_name"][:4]}{"..." if len(sample["item_name"]) > 4 else ""}, '
-            #           f'{err}: {exc_value} in {tb[0]}:{tb[1]} "{tb[2]}" in {tb[3]}')
-                # losses['tech'] = 0.0
-                # print('-' * 30)
-                # note_bd_logits = output['note_bd_logits']
-                # from research.rme.modules.me8 import regulate_boundary
-                # note_bd_pred = regulate_boundary(note_bd_logits, 0.5, 17, word_bd, 8)
-                # print("note_bd_pred.sum(-1)", note_bd_pred.sum(-1))
-                # print("notes.shape", notes.shape)
-                # print("note_bd.sum", note_bd.sum(-1))
-        # gpu_tracker.track()
+            techs = sample['techs']
+            tech_ids = sample['tech_ids']
+            if hparams.get('apply_tech_group_loss', False) and tech_ids is not None:
+                self.add_tech_group_loss(output['tech_logits'], techs, tech_ids, losses)
+            else:
+                self.add_tech_loss(output['tech_logits'], techs, losses)
         return losses, output
+        
+    def add_tech_group_loss(self, tech_logits, techs, tech_ids, losses):
+        bsz, T, num_techs = tech_logits.shape
+        techs = techs.float()
+        tech_losses = torch.zeros([T, num_techs], device=tech_logits.device)
+        for b_idx in range(bsz):
+            # NOTE: tech_ids is a index list
+            tech_losses_i = F.binary_cross_entropy_with_logits(tech_logits[b_idx, :, tech_ids[b_idx]], techs[b_idx, :, tech_ids[b_idx]], reduction='none')  # [T, len(tech_ids)]
+            tech_losses[:, tech_ids[b_idx]] += tech_losses_i    # [T, C]
+        tech_losses /= bsz
+        tech_losses = tech_losses.mean(0)
+        lambda_tech = hparams.get('lambda_tech', 1.0)
+        lambdas_tech = hparams.get('lambdas_tech', '')
+        if lambdas_tech != '' and '-' in lambdas_tech:
+            lambda_tech = [float(i) for i in lambdas_tech.split('-')]
+            assert len(lambda_tech) == hparams.get('tech_num', 6), f"{len(lambda_tech)} {hparams.get('tech_num', 6)}"
+        else:
+            lambda_tech = [lambda_tech for _ in range(hparams.get('tech_num', 6))]
+        losses['breathe'] = tech_losses[0] * lambda_tech[0]
+        losses['pharyngeal'] = tech_losses[1] * lambda_tech[1]
+        losses['vibrato'] = tech_losses[2] * lambda_tech[2]
+        losses['glissando'] = tech_losses[3] * lambda_tech[3]
+        losses['mix'] = tech_losses[4] * lambda_tech[4]
+        losses['falsetto'] = tech_losses[5] * lambda_tech[5]
 
     def add_tech_loss(self, tech_logits, techs, losses):
         bsz, T, num_techs = tech_logits.shape
@@ -128,12 +275,13 @@ class TETask(SpeechBaseTask):
             assert len(lambda_tech) == hparams.get('tech_num', 6), f"{len(lambda_tech)} {hparams.get('tech_num', 6)}"
         else:
             lambda_tech = [lambda_tech for _ in range(hparams.get('tech_num', 6))]
-        losses['mix_tech'] = tech_losses[0] * lambda_tech[0]
-        losses['falsetto_tech'] = tech_losses[1] * lambda_tech[1]
-        losses['breathy_tech'] = tech_losses[2] * lambda_tech[2]
-        losses['pharyngeal_tech'] = tech_losses[3] * lambda_tech[3]
-        losses['vibra_tech'] = tech_losses[4] * lambda_tech[4]
-        losses['glissando_tech'] = tech_losses[5] * lambda_tech[5]
+        losses['breathe'] = tech_losses[0] * lambda_tech[0]
+        losses['pharyngeal'] = tech_losses[1] * lambda_tech[1]
+        losses['vibrato'] = tech_losses[2] * lambda_tech[2]
+        losses['glissando'] = tech_losses[3] * lambda_tech[3]
+        losses['mix'] = tech_losses[4] * lambda_tech[4]
+        losses['falsetto'] = tech_losses[5] * lambda_tech[5]
+
         if hparams.get('tech_focal_loss', None) not in ['none', None, 0]:
             gamma = float(hparams.get('tech_focal_loss', None))
             focal_loss = sigmoid_focal_loss(
@@ -181,7 +329,7 @@ class TETask(SpeechBaseTask):
                     outputs['losses']['tech_f'] = binary_f1_score(tech_logits, techs, threshold)
                 outputs['losses']['tech_a'] = binary_accuracy(tech_logits, techs, threshold)
 
-                tech_names = ['mix_tech', 'falsetto_tech', 'breathy_tech', 'pharyngeal_tech', 'vibra_tech', 'glissando_tech']
+                tech_names = ['breathe', 'pharyngeal', 'vibrato', 'glissando', 'mix', 'falsetto']
                 for tech_idx, tech_name in enumerate(tech_names):
                     if torch.sum(techs[:, :, tech_idx]) > 0:
                         outputs['losses'][f'{tech_name}_auroc'] = binary_auroc(tech_logits[:, :, tech_idx], techs[:, :, tech_idx], threshold)
@@ -250,7 +398,7 @@ class TETask(SpeechBaseTask):
         tech_a = binary_accuracy(tech_logits, tech_gt, threshold)
         res = [tech_auroc, tech_p, tech_r, tech_f, tech_a]
 
-        tech_names = ['mix_tech', 'falsetto_tech', 'breathy_tech', 'pharyngeal_tech', 'vibra_tech', 'glissando_tech']
+        tech_names = ['breathe', 'pharyngeal', 'vibrato', 'glissando', 'mix', 'falsetto']
         for tech_idx, tech_name in enumerate(tech_names):
             if torch.sum(tech_gt[:, tech_idx]) > 0:
                 tech_auroc = binary_auroc(tech_logits[:, tech_idx], tech_gt[:, tech_idx], threshold)
@@ -263,138 +411,76 @@ class TETask(SpeechBaseTask):
                 tech_r = np.nan
                 tech_f = np.nan
             tech_a = binary_accuracy(tech_logits[:, tech_idx], tech_gt[:, tech_idx], threshold)
-            res = res + [tech_auroc, tech_p, tech_r, tech_f, tech_a]
+            res = res + [tech_p, tech_r, tech_f, tech_a, tech_auroc]
 
             fig = f0_tech_to_figure(gt_f0.numpy(), ph_bd.numpy(), tech_pred[:, tech_idx].numpy(), tech_gt[:, tech_idx].numpy(),
                                     tech_probs[:, tech_idx].numpy(), tech_name, fig_name=item_name,
                                     save_path=f'{gen_dir}/plot/{item_name}[{tech_name}].png')
             plt.close(fig)
 
-        res = [res, item_name]
-
-        return res
+        gender = 'male' if 'Tenor' or 'Bass' in item_name else 'female'
+        return gender, res
 
     def test_end(self, outputs):
-        res = []
-        item_names = []
+        res_dict = {'male': [], 'female': [], 'overall': []}
         for r_id, r in tqdm(self.saving_result_pool.get_results(), total=len(self.saving_result_pool)):
-            res.append(r[0])
-            item_names.append(r[1])
+            res_dict[r[0]].append(r[1])
+            res_dict['overall'].append(r[1])
 
-        res = np.array(res)     # [N, 5 + 5x6]
-        results = []
-        for i in range(res.shape[1]):
-            _res = res[:, i]
-            results.append(np.mean(_res[~np.isnan(_res)]))
-
-        scores = {}
-        tech_auroc, tech_p, tech_r, tech_f, tech_a = results[:5]
-        tech_names = ['mix_tech', 'falsetto_tech', 'breathy_tech', 'pharyngeal_tech', 'vibra_tech', 'glissando_tech']
-        for tech_idx, tech_name in enumerate(tech_names):
-            scores[tech_name] = results[(tech_idx+1)*5: (tech_idx+2)*5]
-
-        # print(f"overall |     auroc: {tech_auroc:.3f}")
-        # print(f"overall | precision: {tech_p:.3f}")
-        # print(f"overall |    recall: {tech_r:.3f}")
-        # print(f"overall |        f1: {tech_f:.3f}")
-        # print(f"overall |  accuracy: {tech_a:.3f}")
-        # print('-' * 90)
-        # print(f"overall |     auroc: {tech_auroc:.3f}" + f" || mix_tech     |     auroc: {scores['mix_tech'][0]:.3f}" +    f" || falsetto_tech |     auroc: {scores['falsetto_tech'][0]:.3f}" + f" || breathy_tech |     auroc: {scores['breathy_tech'][0]:.3f}")
-        # print(f"overall | precision: {tech_p:.3f}" +     f" || mix_tech     | precision: {scores['mix_tech'][1]:.3f}" +    f" || falsetto_tech | precision: {scores['falsetto_tech'][1]:.3f}" + f" || breathy_tech | precision: {scores['breathy_tech'][1]:.3f}")
-        # print(f"overall |    recall: {tech_r:.3f}" +     f" || mix_tech     |    recall: {scores['mix_tech'][2]:.3f}" +    f" || falsetto_tech |    recall: {scores['falsetto_tech'][2]:.3f}" + f" || breathy_tech |    recall: {scores['breathy_tech'][2]:.3f}")
-        # print(f"overall |        f1: {tech_f:.3f}" +     f" || mix_tech     |        f1: {scores['mix_tech'][3]:.3f}" +    f" || falsetto_tech |        f1: {scores['falsetto_tech'][3]:.3f}" + f" || breathy_tech |        f1: {scores['breathy_tech'][3]:.3f}")
-        # print(f"overall |  accuracy: {tech_a:.3f}" +     f" || mix_tech     |  accuracy: {scores['mix_tech'][4]:.3f}" +    f" || falsetto_tech |  accuracy: {scores['falsetto_tech'][4]:.3f}" + f" || breathy_tech |  accuracy: {scores['breathy_tech'][4]:.3f}")
-        # print('-' * 110)
-        # print(" " * 30 + f"pharyngeal_tech  |     auroc: {scores['pharyngeal_tech'][0]:.3f}" + f" || vibra_tech   |     auroc: {scores['vibra_tech'][0]:.3f}" +   f" || glissando_tech    |     auroc: {scores['glissando_tech'][0]:.3f}")
-        # print(" " * 30 + f"pharyngeal_tech  | precision: {scores['pharyngeal_tech'][1]:.3f}" + f" || vibra_tech   | precision: {scores['vibra_tech'][1]:.3f}" +   f" || glissando_tech    | precision: {scores['glissando_tech'][1]:.3f}")
-        # print(" " * 30 + f"pharyngeal_tech  |    recall: {scores['pharyngeal_tech'][2]:.3f}" + f" || vibra_tech   |    recall: {scores['vibra_tech'][2]:.3f}" +   f" || glissando_tech    |    recall: {scores['glissando_tech'][2]:.3f}")
-        # print(" " * 30 + f"pharyngeal_tech  |        f1: {scores['pharyngeal_tech'][3]:.3f}" + f" || vibra_tech   |        f1: {scores['vibra_tech'][3]:.3f}" +   f" || glissando_tech    |        f1: {scores['glissando_tech'][3]:.3f}")
-        # print(" " * 30 + f"pharyngeal_tech  |  accuracy: {scores['pharyngeal_tech'][4]:.3f}" + f" || vibra_tech   |  accuracy: {scores['vibra_tech'][4]:.3f}" +   f" || glissando_tech    |  accuracy: {scores['glissando_tech'][4]:.3f}")
-
-        print("=" * 20 + "Overall assessment" + "=" * 20)
-        print(f"|  item     |   auroc   | precision |  recall   |    f1     |  accuracy |")
-        print('-' * 73)
-        print(f"|  overall  |   {tech_auroc:.3f}   |   {tech_p:.3f}   |   {tech_r:.3f}   |   {tech_f:.3f}   |   {tech_a:.3f}   |")
-        print(f"|    mix_tech    |   {scores['mix_tech'][0]:.3f}   |   {scores['mix_tech'][1]:.3f}   |   {scores['mix_tech'][2]:.3f}   |   {scores['mix_tech'][3]:.3f}   |   {scores['mix_tech'][4]:.3f}   |")
-        print(f"| falsetto_tech  |   {scores['falsetto_tech'][0]:.3f}   |   {scores['falsetto_tech'][1]:.3f}   |   {scores['falsetto_tech'][2]:.3f}   |   {scores['falsetto_tech'][3]:.3f}   |   {scores['falsetto_tech'][4]:.3f}   |")
-        print(f"|  breathy_tech  |   {scores['breathy_tech'][0]:.3f}   |   {scores['breathy_tech'][1]:.3f}   |   {scores['breathy_tech'][2]:.3f}   |   {scores['breathy_tech'][3]:.3f}   |   {scores['breathy_tech'][4]:.3f}   |")
-        print(f"|  pharyngeal_tech   |   {scores['pharyngeal_tech'][0]:.3f}   |   {scores['pharyngeal_tech'][1]:.3f}   |   {scores['pharyngeal_tech'][2]:.3f}   |   {scores['pharyngeal_tech'][3]:.3f}   |   {scores['pharyngeal_tech'][4]:.3f}   |")
-        print(f"|  vibra_tech   |   {scores['vibra_tech'][0]:.3f}   |   {scores['vibra_tech'][1]:.3f}   |   {scores['vibra_tech'][2]:.3f}   |   {scores['vibra_tech'][3]:.3f}   |   {scores['vibra_tech'][4]:.3f}   |")
-        print(f"|   glissando_tech    |   {scores['glissando_tech'][0]:.3f}   |   {scores['glissando_tech'][1]:.3f}   |   {scores['glissando_tech'][2]:.3f}   |   {scores['glissando_tech'][3]:.3f}   |   {scores['glissando_tech'][4]:.3f}   |")
-        print()
-
-        ## other specific stats
-
-        # spk
-        print()
-        print("=" * 20 + "Speaker assessment" + "=" * 20)
-
-        item_idxs = {'male': [], 'female': []}
-        for item_idx, item_name in enumerate(item_names):
-            if '男声' in item_name:
-                item_idxs['male'].append(item_idx)
-            else:
-                item_idxs['female'].append(item_idx)
-        for spk in ['male', 'female']:
+        for gender, res in res_dict.items():
+            print("=" * 20 + f" {gender} " + "=" * 20)
+            res = np.array(res)
             results = []
             for i in range(res.shape[1]):
-                _res = res[item_idxs[spk], i]
+                _res = res[:, i]
                 results.append(np.mean(_res[~np.isnan(_res)]))
-            scores = {}
-            tech_auroc, tech_p, tech_r, tech_f, tech_a = results[:5]
-            tech_names = ['mix_tech', 'falsetto_tech', 'breathy_tech', 'pharyngeal_tech', 'vibra_tech', 'glissando_tech']
+
+            tech_names = ['overall', 'breathe', 'pharyngeal', 'vibrato', 'glissando', 'mix', 'falsetto']
             for tech_idx, tech_name in enumerate(tech_names):
-                scores[tech_name] = results[(tech_idx + 1) * 5: (tech_idx + 2) * 5]
+                print(f"{tech_name}: precision: {results[4 * tech_idx]:.3f}, recall: {results[4 * tech_idx + 1]:.3f}, f1: {results[4 * tech_idx + 2]:.3f}, accuracy: {results[4 * tech_idx + 3]:.3f}, auroc: {results[4 * tech_idx + 4]:.3f}")
 
-            print(f"-" * 20 + ("华为男声" if spk == 'male' else '华为女声') + f" {len(item_idxs[spk])} items" + "-" * 20)
-            print(f"|  item     |   auroc   | precision |  recall   |    f1     |  accuracy |")
-            print('-' * 73)
-            print(f"|  overall  |   {tech_auroc:.3f}   |   {tech_p:.3f}   |   {tech_r:.3f}   |   {tech_f:.3f}   |   {tech_a:.3f}   |")
-            print(f"|    mix_tech    |   {scores['mix_tech'][0]:.3f}   |   {scores['mix_tech'][1]:.3f}   |   {scores['mix_tech'][2]:.3f}   |   {scores['mix_tech'][3]:.3f}   |   {scores['mix_tech'][4]:.3f}   |")
-            print(f"| falsetto_tech  |   {scores['falsetto_tech'][0]:.3f}   |   {scores['falsetto_tech'][1]:.3f}   |   {scores['falsetto_tech'][2]:.3f}   |   {scores['falsetto_tech'][3]:.3f}   |   {scores['falsetto_tech'][4]:.3f}   |")
-            print(f"|  breathy_tech  |   {scores['breathy_tech'][0]:.3f}   |   {scores['breathy_tech'][1]:.3f}   |   {scores['breathy_tech'][2]:.3f}   |   {scores['breathy_tech'][3]:.3f}   |   {scores['breathy_tech'][4]:.3f}   |")
-            print(f"|  pharyngeal_tech   |   {scores['pharyngeal_tech'][0]:.3f}   |   {scores['pharyngeal_tech'][1]:.3f}   |   {scores['pharyngeal_tech'][2]:.3f}   |   {scores['pharyngeal_tech'][3]:.3f}   |   {scores['pharyngeal_tech'][4]:.3f}   |")
-            print(f"|  vibra_tech   |   {scores['vibra_tech'][0]:.3f}   |   {scores['vibra_tech'][1]:.3f}   |   {scores['vibra_tech'][2]:.3f}   |   {scores['vibra_tech'][3]:.3f}   |   {scores['vibra_tech'][4]:.3f}   |")
-            print(f"|   glissando_tech    |   {scores['glissando_tech'][0]:.3f}   |   {scores['glissando_tech'][1]:.3f}   |   {scores['glissando_tech'][2]:.3f}   |   {scores['glissando_tech'][3]:.3f}   |   {scores['glissando_tech'][4]:.3f}   |")
-            print()
 
-        # per song
-        print()
-        print("=" * 20 + "Per sentence assessment" + "=" * 20)
+class TEODTask(TETask):
+    def test_start(self):
+        self.saving_result_pool = MultiprocessManager(int(os.getenv('N_PROC', os.cpu_count())))
+        self.saving_results_futures = []
+        self.gen_dir = os.path.join(
+            hparams['work_dir'], f'generated_{self.trainer.global_step}_od_{hparams["gen_dir_name"]}')
+        os.makedirs(self.gen_dir, exist_ok=True)
+        os.makedirs(f'{self.gen_dir}/plot', exist_ok=True)
 
-        item_idxs = {}
-        for item_idx, item_name in enumerate(item_names):
-            item_name_ = item_name.split('#')
-            sentence_name = '#'.join(item_name_[:-1])
-            if sentence_name in item_idxs:
-                item_idxs[sentence_name].append(item_idx)
-            else:
-                item_idxs[sentence_name] = [item_idx]
-        # print(item_idxs)
-        for sentence_name in sorted(item_idxs.keys()):
-            results = []
-            for i in range(res.shape[1]):
-                _res = res[item_idxs[sentence_name], i]
-                results.append(np.mean(_res[~np.isnan(_res)]))
-            scores = {}
-            tech_auroc, tech_p, tech_r, tech_f, tech_a = results[:5]
-            tech_names = ['mix_tech', 'falsetto_tech', 'breathy_tech', 'pharyngeal_tech', 'vibra_tech', 'glissando_tech']
-            for tech_idx, tech_name in enumerate(tech_names):
-                scores[tech_name] = results[(tech_idx + 1) * 5: (tech_idx + 2) * 5]
+    def test_step(self, sample, batch_idx):
+        _, outputs = self.run_model(sample, infer=True)
+        ph_bd = sample['ph_bd'][0].cpu()
+        ph = sample['ph'][0]
+        # tech_gt = sample['techs'][0].cpu()
+        f0 = denorm_f0(sample['f0'], sample['uv'])[0].cpu()
+        tech_logits = outputs['tech_logits'][0].cpu()
+        tech_probs = torch.sigmoid(outputs['tech_logits'])[0].cpu()
+        tech_pred = outputs['tech_pred'][0].cpu()
+        threshold = hparams.get('tech_threshold', 0.8)
 
-            print(f"-" * 20 + f"{sentence_name}" + f" {len(item_idxs[sentence_name])} items" + "-" * 20)
-            print(f"|  item     |   auroc   | precision |  recall   |    f1     |  accuracy |")
-            print('-' * 73)
-            print(f"|  overall  |   {tech_auroc:.3f}   |   {tech_p:.3f}   |   {tech_r:.3f}   |   {tech_f:.3f}   |   {tech_a:.3f}   |")
-            print(f"|    mix_tech    |   {scores['mix_tech'][0]:.3f}   |   {scores['mix_tech'][1]:.3f}   |   {scores['mix_tech'][2]:.3f}   |   {scores['mix_tech'][3]:.3f}   |   {scores['mix_tech'][4]:.3f}   |")
-            print(f"| falsetto_tech  |   {scores['falsetto_tech'][0]:.3f}   |   {scores['falsetto_tech'][1]:.3f}   |   {scores['falsetto_tech'][2]:.3f}   |   {scores['falsetto_tech'][3]:.3f}   |   {scores['falsetto_tech'][4]:.3f}   |")
-            print(f"|  breathy_tech  |   {scores['breathy_tech'][0]:.3f}   |   {scores['breathy_tech'][1]:.3f}   |   {scores['breathy_tech'][2]:.3f}   |   {scores['breathy_tech'][3]:.3f}   |   {scores['breathy_tech'][4]:.3f}   |")
-            print(f"|  pharyngeal_tech   |   {scores['pharyngeal_tech'][0]:.3f}   |   {scores['pharyngeal_tech'][1]:.3f}   |   {scores['pharyngeal_tech'][2]:.3f}   |   {scores['pharyngeal_tech'][3]:.3f}   |   {scores['pharyngeal_tech'][4]:.3f}   |")
-            print(f"|  vibra_tech   |   {scores['vibra_tech'][0]:.3f}   |   {scores['vibra_tech'][1]:.3f}   |   {scores['vibra_tech'][2]:.3f}   |   {scores['vibra_tech'][3]:.3f}   |   {scores['vibra_tech'][4]:.3f}   |")
-            print(f"|   glissando_tech    |   {scores['glissando_tech'][0]:.3f}   |   {scores['glissando_tech'][1]:.3f}   |   {scores['glissando_tech'][2]:.3f}   |   {scores['glissando_tech'][3]:.3f}   |   {scores['glissando_tech'][4]:.3f}   |")
-            print()
-
+        item_name = sample['item_name'][0]
+        gen_dir = self.gen_dir
+        # self.save_result(item_name,gen_dir, f0, ph_bd, tech_gt, tech_probs, tech_pred, tech_logits, threshold)
+        self.saving_result_pool.add_job(self.save_result, args=[
+            item_name, gen_dir, f0, ph, ph_bd, None, tech_probs, tech_pred, tech_logits, threshold])
         return {}
+
+    @staticmethod
+    def save_result(item_name, gen_dir, gt_f0=None, ph=None, ph_bd=None, tech_gt=None, tech_probs=None, tech_pred=None,
+                    tech_logits=None, threshold=0.8):
+        tech_names = 'breathe', 'pharyngeal', 'vibrato', 'glissando', 'mix', 'falsetto'
+        for tech_idx, tech_name in enumerate(tech_names):
+            print(item_name, tech_name)
+            fig = f0_tech_txt_to_figure(gt_f0.numpy(), ph, ph_bd.numpy(), tech_pred[:, tech_idx].numpy(), None,
+                                        tech_probs[:, tech_idx].numpy(), tech_name, fig_name=item_name,
+                                        save_path=f'{gen_dir}/plot/{item_name}[{tech_name}].png')
+            plt.close(fig)
+
+    def test_end(self, outputs):
+        pass
+
 
 def bd_to_idxs(bd):
     # bd [T]
@@ -427,5 +513,27 @@ def f0_tech_to_figure(f0_gt, ph_bd, tech_pred, tech_gt, tech_probs, tech_name, f
         plt.savefig(save_path, format='png')
     return fig
 
-
+def f0_tech_txt_to_figure(f0_gt, ph, ph_bd, tech_pred, tech_gt, tech_probs, tech_name, fig_name='', save_path=None):
+    fig = plt.figure(figsize=(12, 8))
+    plt.plot(f0_gt, color='r', label='gt f0')
+    ph_idxs = [0] + bd_to_idxs(ph_bd) + [len(ph_bd)]
+    t_pred = np.zeros(f0_gt.shape[0])
+    t_logits = np.zeros(f0_gt.shape[0])
+    # print('-'*40)
+    # print('f0_gt.shape[0]', f0_gt.shape[0])
+    # print('ph_idxs', ph_idxs)
+    for i in range(len(ph_idxs) - 1):
+        shift = (i % 8) + 1
+        if ph != "":
+            plt.text(ph_idxs[i], shift * 4, ph[i])
+            plt.vlines(ph_idxs[i], 0, 40, colors='b')
+        t_pred[ph_idxs[i]: ph_idxs[i + 1]] = tech_pred[i] * 200
+        t_logits[ph_idxs[i]: ph_idxs[i + 1]] = tech_probs[i] * 200
+    plt.plot(t_pred, color='green', label=f"pred {tech_name}")
+    plt.plot(t_logits, color='orange', label=f"logits {tech_name}")
+    plt.title(fig_name)
+    plt.legend()
+    if save_path is not None:
+        plt.savefig(save_path, format='png')
+    return fig
 

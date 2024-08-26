@@ -5,11 +5,12 @@ import logging
 import json
 from functools import partial
 from pathlib import Path
-
+import glob
 import numpy as np
 from tqdm import tqdm
 import pyworld as pw
 import torch
+from utils.audio import librosa_wav2spec
 
 from data_gen.tts.base_binarizer import BaseBinarizer, BinarizationError
 from utils.commons.hparams import hparams
@@ -42,24 +43,26 @@ class TechExtractionBinarizer(BaseBinarizer):
         return train_item_names, test_item_names
 
     def load_meta_data(self):
-        metafile_path = hparams.get('metafile_path', f"{self.processed_data_dir}/metadata.json")
-        if ',' in metafile_path:
-            metafile_paths = metafile_path.split(',')
-            ds_names = hparams.get('ds_names', ','.join([str(i) for i in range(len(metafile_paths))])).split(',')
-        else:
-            metafile_paths = [metafile_path]
-            ds_names = [hparams.get('ds_names', '0')]
+        metafile_paths = glob.glob(f"{self.processed_data_dir}/*/metadata.json")
+        ds_names = "your_dataset_name"
+        #metafile_path = hparams.get('metafile_path', f"{self.processed_data_dir}/metadata.json")
+        #if ',' in metafile_path:
+        #    metafile_paths = metafile_path.split(',')
+        #    ds_names = hparams.get('ds_names', ','.join([str(i) for i in range(len(metafile_paths))])).split(',')
+        #else:
+        #    metafile_paths = [metafile_path]
+        #    ds_names = [hparams.get('ds_names', '0')]
         for idx, metafile_path in enumerate(metafile_paths):
             items_list = json.load(open(metafile_path))
-            for r in tqdm(items_list, desc=f'| Loading meta data for dataset {ds_names[idx]}.'):
+            for r in tqdm(items_list, desc=f'| Loading meta data for dataset {ds_names} {idx}.'):
+                # print(r)
                 item_name = r['item_name']
                 if item_name in self.items:
                     print(f'warning: item name {item_name} duplicated')
                 self.items[item_name] = r
                 self.item_names.append(item_name)
-                self.items[item_name]['ds_name'] = ds_names[idx]
-                self.items[item_name]['wav_fn'] = \
-                    os.path.join(hparams.get('metafile_wav_root_dir', '/'), self.items[item_name]['wav_fn'])
+                self.items[item_name]['ds_name'] = ds_names
+                self.items[item_name]['wav_fn'] = os.path.join(f"{self.processed_data_dir}", self.items[item_name]['wav_fn'])
                 self.spk_map.add(r['singer'])
         if self.binarization_args['shuffle']:
             random.seed(hparams.get('seed', 42))
@@ -90,7 +93,26 @@ class TechExtractionBinarizer(BaseBinarizer):
         self.process_data('valid')
         self.process_data('test')
         self.process_data('train')
-
+    @classmethod
+    def process_audio(cls, wav_fn, res, binarization_args):
+        wav2spec_dict = librosa_wav2spec(
+            wav_fn,
+            fft_size=hparams['fft_size'],
+            hop_size=hparams['hop_size'],
+            win_length=hparams['win_size'],
+            num_mels=hparams['audio_num_mel_bins'],
+            fmin=hparams['fmin'],
+            fmax=hparams['fmax'],
+            sample_rate=hparams['audio_sample_rate'],
+            loud_norm=hparams['loud_norm'])
+        mel = wav2spec_dict['mel']
+        wav = wav2spec_dict['wav'].astype(np.float16)
+        wav_orig = wav2spec_dict['wav_orig'].astype(np.float16)
+        # wav = wav2spec_dict['wav']
+        if binarization_args['with_linear']:
+            res['linear'] = wav2spec_dict['linear']
+        res.update({'mel': mel, 'wav': wav, 'sec': len(wav) / hparams['audio_sample_rate'], 'len': mel.shape[0]})
+        return (wav, wav_orig), mel
     @torch.no_grad()
     def process_data(self, prefix):
         data_dir = hparams['binary_data_dir']
@@ -171,10 +193,11 @@ class TechExtractionBinarizer(BaseBinarizer):
             if f0 is not None:
                 item['f0'] = f0
 
-            mel2ph, mel2word, dur_word = self.process_align(item["ph_durs"], item['ph2words'], mel)
-            if mel2word[0] == 0:    # better start from 1, consistent with mel2ph
+            mel2ph, mel2word, dur_word = self.process_align(item["ph_durs"], mel, item.get('ph2words', None))
+            item['mel2ph']= mel2ph
+            if mel2word!= None and mel2word[0] == 0:    # better start from 1, consistent with mel2ph
                 mel2word = [i + 1 for i in mel2word]
-            item['mel2ph'], item['mel2word'], item['dur_word'] = mel2ph, mel2word, dur_word
+                item['mel2word'], item['dur_word'] = mel2word, dur_word
 
             if binarization_args.get('with_breathiness', False):
                 breathiness = get_breathiness_pyworld(wav, item['f0'], length, hparams)
@@ -194,7 +217,7 @@ class TechExtractionBinarizer(BaseBinarizer):
         return item
 
     @staticmethod
-    def process_align(ph_durs, ph2words, mel, hop_size=hparams['hop_size'], audio_sample_rate=hparams['audio_sample_rate']):
+    def process_align(ph_durs, mel, ph2words= None, hop_size=hparams['hop_size'], audio_sample_rate=hparams['audio_sample_rate']):
         mel2ph = np.zeros([mel.shape[0]], int)
         startTime = 0
 
@@ -204,7 +227,50 @@ class TechExtractionBinarizer(BaseBinarizer):
             mel2ph[start_frame:end_frame] = i_ph + 1
             startTime = startTime + ph_durs[i_ph]
 
-        mel2word = [ph2words[p - 1] for p in mel2ph]
-        dur_word = mel2token_to_dur(mel2word, max(ph2words))
+        mel2word, dur_word = None, None
+        if ph2words!= None:
+            mel2word = [ph2words[p - 1] for p in mel2ph]
+            dur_word = mel2token_to_dur(mel2word, max(ph2words))
+            dur_word = dur_word.tolist()
+        return mel2ph, mel2word, dur_word
 
-        return mel2ph, mel2word, dur_word.tolist()
+class OutDomainTechExtractionBinarizer(TechExtractionBinarizer):
+    def load_meta_data(self):
+        metafile_paths = glob.glob(f"{self.processed_data_dir}/meta.json")
+        ds_names = "your_dataset_name"
+        #metafile_path = hparams.get('metafile_path', f"{self.processed_data_dir}/metadata.json")
+        #if ',' in metafile_path:
+        #    metafile_paths = metafile_path.split(',')
+        #    ds_names = hparams.get('ds_names', ','.join([str(i) for i in range(len(metafile_paths))])).split(',')
+        #else:
+        #    metafile_paths = [metafile_path]
+        #    ds_names = [hparams.get('ds_names', '0')]
+        for idx, metafile_path in enumerate(metafile_paths):
+            items_list = json.load(open(metafile_path))
+            for r in tqdm(items_list, desc=f'| Loading meta data for dataset {ds_names} {idx}.'):
+                item_name = r['item_name']
+                if item_name in self.items:
+                    print(f'warning: item name {item_name} duplicated')
+                self.items[item_name] = r
+                self.item_names.append(item_name)
+                self.items[item_name]['ds_name'] = ds_names
+                self.items[item_name]['wav_fn'] = os.path.join(f"{self.processed_data_dir}", self.items[item_name]['wav_fn'])
+                self.spk_map.add(r['singer'])
+        if self.binarization_args['shuffle']:
+            random.seed(hparams.get('seed', 42))
+            random.shuffle(self.item_names)
+        self._train_item_names, self._test_item_names = [], deepcopy(self.item_names)
+
+    def split_train_test_set(self, item_names):
+        return [], item_names
+
+    def process(self):
+        self.load_meta_data()
+        os.makedirs(hparams['binary_data_dir'], exist_ok=True)
+
+        self.spk_map.add('_others')
+        self.spk_map = sorted(list(self.spk_map))
+        self.spk_map = {self.spk_map[idx]: idx for idx in range(len(self.spk_map))}
+        json.dump(self.spk_map, open(f"{hparams['binary_data_dir']}/spk_map.json", 'w'), indent=2)
+
+        self.process_data('test')
