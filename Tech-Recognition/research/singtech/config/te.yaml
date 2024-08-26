@@ -1,28 +1,25 @@
 base_config:
   - ./base.yaml
 
-raw_data_dir: ''
-processed_data_dir: ./processed_data_dir
-binary_data_dir: ./processed_data_dir
-metafile_path: /root/autodl-tmp/SingTechRecog-lrq/data/processed/metadata.json
-metafile_wav_root_dir: /mnt/sdb/liruiqi/datasets/huawei_tech
-ds_names: ''
+raw_data_dir: 'data/raw/gtsinger'
+processed_data_dir: data/processed/gtsinger
+binary_data_dir: data/binary/gtsinger
 ds_names_in_training: ''  # ';' separated
 ds_names_in_testing: ''   # default: '', means all in testing
-noise_data_dir: /mnt/sdb/liruiqi/SingingDictation/data/binary/musan_24k
-# noise_data_dir: ''
+noise_data_dir: data/binary/musan_24k
+
 binarizer_cls: research.singtech.config.te_binarizer.TechExtractionBinarizer
 binarization_args:
   with_wav: true
   with_mel: false
-  with_breathiness: false
-  with_energy: false
-  with_zcr: false
+  with_breathiness: true
+  with_energy: true
+  with_zcr: true
 
 task_cls: research.singtech.te_task.TETask
 
 test_prefixes: [
-  
+  # The item name of the test_prefixes should be the same as the name of the test_prefixes in the dataset.
 ]
 
 audio_sample_rate: 24000
@@ -38,9 +35,7 @@ hidden_size: 256
 # model related params
 ###########
 model: te
-# me5
 conformer_kernel: 9
-# me8
 updown_rates: 2-2-2-2
 channel_multiples: 1-1-1-1
 bkb_net: conformer   # conv|conformer|transformer|wavenet
@@ -52,10 +47,10 @@ unet_skip_scale: 0.7071067812   # 1 / sqrt(2)
 # note prediction related hparams
 ###########
 # f0
-f0_add_noise: gaussian:0.04  # gaussian:0.04
+f0_add_noise: gaussian:0.04  # default: gaussian:0.04, you can also use none
 # pitch
 pe: rmvpe  # rmvpe|parselmouth|pw
-pe_ckpt: checkpoints/rmvpe/model.pt
+pe_ckpt: /path/your/pe/ckpt
 f0_bin: 256
 f0_filepath: ''
 use_pitch_embed: true
@@ -77,7 +72,7 @@ label_pos_weight_decay: 0.95
 # noise
 ###########
 noise_snr: 6-20
-noise_prob: 0
+noise_prob: 0.8
 noise_in_test: false
 
 loud_norm: true
@@ -98,7 +93,7 @@ scheduler_lr_step_size: 500
 warmup_updates: 0
 
 max_epochs: 1000
-max_updates: 240000
+max_updates: 60000
 max_tokens: 80000
 max_sentences: 32
 val_check_interval: 500

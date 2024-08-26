@@ -1,5 +1,26 @@
 # Technique Recognition
 
+## Quick Start
+
+Our model for technique recognition is tested in **python3.9, torch 2.1.1, CUDA 11.8**. We provide a series of install commands([install.sh](./research/singtech/scripts/install.sh)) for easier installation.
+
+```bash
+conda create -n tech-recog python==3.9
+conda activate tech-recog
+pip install torch==2.1.1 torchvision==0.16.1 torchaudio==2.1.1 --index-url https://download.pytorch.org/whl/cu118
+pip install tensorflow==2.9.0 tensorflow-estimator==2.9.0 tensorboardX==2.5
+pip install pyyaml matplotlib==3.5 pandas pyworld==0.2.12 librosa torchmetrics
+pip install mir_eval pretty_midi pyloudnorm scikit-image textgrid g2p_en npy_append_array einops webrtcvad
+export PYTHONPATH=.
+```
+
+We also provide the [despedencies](./requirements.txt) of the environment, you can also use the command below for installation after you install **torch 2.1.1**.
+
+```bash
+cd Tech-Recognition
+pip install -r requirements.txt
+```
+
 ## Data Preparation
 
 1. Downlowad GTSinger and process all json to `metadata.json`.
@@ -8,6 +29,7 @@
 4. Preprocess Dataset 
 
 ```bash
+cd Tech-Recognition
 export PYTHONPATH=.
 python data_gen/tts/runs/binarize.py --config research/singtech/config/te.yaml
 ```

@@ -1,7 +1,7 @@
 # task
-base_config:
-  - ../config_base.yaml
-  - ./dataset_params.yaml
+#base_config:
+#  - ../config_base.yaml
+#  - ./dataset_params.yaml
 save_codes: ['modules', 'research']
 amp: false
 seed: 42
