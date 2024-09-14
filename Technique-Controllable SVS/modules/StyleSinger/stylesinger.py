@@ -138,19 +138,20 @@ class StyleSinger(FastSpeech2):
                 spec_min=hparams['spec_min'], spec_max=hparams['spec_max'],
             )
 
-    def forward(self, txt_tokens, mel2ph=None, spk_embed=None, emo_embed=None, ref_mels=None, ref_f0=None,
+    def forward(self, txt_tokens, mel2ph=None, spk_embed=None, spk_id=None,emo_embed=None, ref_mels=None, ref_f0=None,
                 f0=None, uv=None, skip_decoder=False, global_steps=0, infer=False, note=None, note_dur=None, note_type=None,
                 mix=None,falsetto=None,breathy=None,pharyngeal=None,glissando=None,vibrato=None,**kwargs):
         ret = {}
-        print(vibrato)
-        # print(txt_tokens.size(),spk_embed.size(),emo_embed.size())
         encoder_out = self.encoder(txt_tokens)  # [B, T, C]
         note_out = self.note_encoder(note, note_dur, note_type)
         encoder_out = encoder_out + note_out
         src_nonpadding = (txt_tokens > 0).float()[:, :, None]
 
         # add spk/emo embed
-        ret['spk_embed'] =spk_embed = self.spk_embed_proj(spk_embed)[:, None, :]
+        if spk_embed is not None:
+            ret['spk_embed'] =spk_embed = self.spk_embed_proj(spk_embed)[:, None, :]
+        else:
+            ret['spk_embed'] =spk_embed = self.spk_embed_proj(spk_id)[:, None, :]
         if hparams['emo']:
             ret['emo_embed'] =emo_embed = self.emo_embed_proj(emo_embed)[:, None, :]
         # add dur
@@ -317,14 +318,14 @@ class StyleSinger(FastSpeech2):
             uv = pitch_pred[:, :, 1]
             uv[midi_notes[:, 0, :] == 0] = 1
             f0 = minmax_denorm(f0)
-            ret["gdiff2"] = 0.0
-            ret["mdiff2"] = 0.0
+            ret["gdiff"] = 0.0
+            ret["mdiff"] = 0.0
 
         else:
             nonpadding = (mel2ph > 0).float()
             norm_f0 = minmax_norm(f0)
 
-            ret["mdiff2"], ret["gdiff2"], ret["nll2"] = self.f0_gen_inpainte(decoder_inp.transpose(-1, -2), norm_f0.unsqueeze(dim=1), uv, nonpadding, ret, infer)
+            ret["mdiff"], ret["gdiff"], ret["nll"] = self.f0_gen_inpainte(decoder_inp.transpose(-1, -2), norm_f0.unsqueeze(dim=1), uv, nonpadding, ret, infer)
 
         f0=f0[:,:,None]
         uv=uv[:,:,None]
