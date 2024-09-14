@@ -47,7 +47,8 @@ class StyleSingerTask(FastSpeech2Task):
         uv = sample['uv']  # [B, T_s] 0/1
         notes, note_durs, note_types = sample["notes"], sample["note_durs"], sample["note_types"]
 
-        spk_embed = sample.get('spk_embed') if not hparams['use_spk_id'] else sample.get('spk_id')
+        spk_embed = sample.get('spk_embed') if hparams['use_spk_embed'] else None
+        spk_id = sample.get('spk_id') if hparams['use_spk_id'] else None
         
         if hparams['emo']:
             emo_embed = sample.get('emo_embed')
@@ -58,7 +59,7 @@ class StyleSingerTask(FastSpeech2Task):
             mix,falsetto,breathy,pharyngeal,glissando,vibrato=sample['mix'],sample['falsetto'],sample['breathy'],sample['pharyngeal'],sample['glissando'],sample['vibrato']
         else:
             mix,falsetto,breathy,pharyngeal,glissando,vibrato=None,None,None,None,None,None
-        output = model(txt_tokens, mel2ph=mel2ph, spk_embed=spk_embed, emo_embed=emo_embed,
+        output = model(txt_tokens, mel2ph=mel2ph, spk_embed=spk_embed, spk_id=spk_id,emo_embed=emo_embed,
                         ref_mels=target, ref_f0=f0, f0=f0, uv=uv, tgt_mels=target, global_steps=self.global_step, infer=False, note=notes, note_dur=note_durs, note_type=note_types,
                         mix=mix,falsetto=falsetto,breathy=breathy,pharyngeal=pharyngeal,glissando=glissando,vibrato=vibrato)
         losses = {}
@@ -84,10 +85,8 @@ class StyleSingerTask(FastSpeech2Task):
         uv = sample['uv']
         nonpadding = (mel2ph != 0).float()
         if hparams["f0_gen"] == "gmdiff":
-            losses["gdiff1"] = output["gdiff1"]
-            losses["mdiff1"] = output["mdiff1"]
-            losses["gdiff2"] = output["gdiff2"]
-            losses["mdiff2"] = output["mdiff2"]
+            losses["gdiff"] = output["gdiff"]
+            losses["mdiff"] = output["mdiff"]
         elif hparams["f0_gen"] == "conv":
             self.add_f0_loss(output['pitch_pred'], f0, uv, losses, nonpadding=nonpadding) # output['pitch_pred']: [B, T, 2], f0: [B, T], uv: [B, T]
 
@@ -110,7 +109,8 @@ class StyleSingerTask(FastSpeech2Task):
             if self.vocoder is None:
                 self.vocoder: BaseVocoder = get_vocoder_cls(hparams)()
             if self.global_step > 0:
-                spk_embed = sample.get('spk_embed') if not hparams['use_spk_id'] else sample.get('spk_id')
+                spk_embed = sample.get('spk_embed') if not hparams['use_spk_id'] else None
+                spk_id = sample.get('spk_id') if hparams['use_spk_id'] else None
                 if hparams['emo']:
                     emo_embed = sample.get('emo_embed')
                 else:
@@ -123,7 +123,7 @@ class StyleSingerTask(FastSpeech2Task):
                     mix,falsetto,breathy,pharyngeal,glissando,vibrato=sample['mix'],sample['falsetto'],sample['breathy'],sample['pharyngeal'],sample['glissando'],sample['vibrato']
                 else:
                     mix,falsetto,breathy,pharyngeal,glissando,vibrato=None,None,None,None,None,None
-                model_out = self.model(sample['txt_tokens'], spk_embed=spk_embed, emo_embed=emo_embed, ref_mels=ref_mels, ref_f0=ref_f0,
+                model_out = self.model(sample['txt_tokens'], spk_embed=spk_embed, spk_id=spk_id,emo_embed=emo_embed, ref_mels=ref_mels, ref_f0=ref_f0,
                                         global_steps=self.global_step, infer=True, note=notes, note_dur=note_durs, note_type=note_types,
                                         mix=mix,falsetto=falsetto,breathy=breathy,pharyngeal=pharyngeal,glissando=glissando,vibrato=vibrato)
                 f0_pred=model_out['f0_denorm'].cpu().numpy()
@@ -173,7 +173,8 @@ class StyleSingerTask(FastSpeech2Task):
         self.vocoder: BaseVocoder = get_vocoder_cls(hparams)()
 
     def test_step(self, sample, batch_idx):
-        spk_embed = sample.get('spk_embed') if not hparams['use_spk_id'] else sample.get('spk_id')
+        spk_embed = sample.get('spk_embed') if not hparams['use_spk_id'] else None
+        spk_id = sample.get('spk_id') if hparams['use_spk_id'] else None
         if hparams['emo']:
             emo_embed = sample.get('emo_embed')
         else:
@@ -196,7 +197,7 @@ class StyleSingerTask(FastSpeech2Task):
             mix,falsetto,breathy,pharyngeal,glissando,vibrato=None,None,None,None,None,None
 
         run_model = lambda: self.model(
-            txt_tokens, spk_embed=spk_embed, emo_embed=emo_embed, mel2ph=mel2ph, 
+            txt_tokens, spk_embed=spk_embed, spk_id=spk_id,emo_embed=emo_embed, mel2ph=mel2ph, 
             f0=f0, uv=uv, ref_mels=ref_mels, ref_f0=ref_f0, global_steps=global_steps, infer=True, note=notes, note_dur=note_durs, note_type=note_types,
             mix=mix,falsetto=falsetto,breathy=breathy,pharyngeal=pharyngeal,glissando=glissando,vibrato=vibrato)
         outputs = run_model()

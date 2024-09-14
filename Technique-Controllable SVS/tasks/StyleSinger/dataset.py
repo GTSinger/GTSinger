@@ -162,7 +162,10 @@ class StyleSinger_dataset(BaseSingerdataset):
         sample["note"], sample["note_dur"], sample["note_type"] = note, note_dur, note_type
         if hparams['emo']:
             sample["emo_embed"] = torch.Tensor(item['emo_embed'])
-        sample["spk_embed"] = torch.Tensor(item['spk_embed'])
+        if hparams['use_spk_embed']:
+            sample["spk_embed"] = torch.Tensor(item['spk_embed'])
+        if hparams['use_spk_id']:
+            sample["spk_id"] = int(item['spk_id'])
 
         if hparams['tech']:
             mix = torch.LongTensor(item['mix_tech'][:hparams['max_input_tokens']])
@@ -185,8 +188,12 @@ class StyleSinger_dataset(BaseSingerdataset):
         note_durs = collate_1d_or_2d([s['note_dur'] for s in samples], 0.0)
         note_types = collate_1d_or_2d([s['note_type'] for s in samples], 0.0)
         batch["notes"], batch["note_durs"], batch["note_types"] = notes, note_durs, note_types
-        spk_embed = torch.stack([s['spk_embed'] for s in samples])
-        batch['spk_embed'] = spk_embed
+        if hparams['use_spk_embed']:
+            spk_embed = torch.stack([s['spk_embed'] for s in samples])
+            batch['spk_embed'] = spk_embed
+        if hparams['use_spk_id']:
+            spk_id = torch.LongTensor([s['spk_id'] for s in samples])
+            batch['spk_id'] = spk_id
         if hparams['emo']:
             emo_embed = torch.stack([s['emo_embed'] for s in samples])
             batch['emo_embed'] = emo_embed
