@@ -119,12 +119,6 @@ class StyleSinger(FastSpeech2):
             cond_hs = 80
             if hparams.get('use_txt_cond', True):
                 cond_hs = cond_hs + hparams['hidden_size']
-            if hparams['emo']:
-                cond_hs+=hparams['hidden_size']
-            if hparams['style']:
-                cond_hs+=hparams['hidden_size']
-            if hparams['tech']:
-                cond_hs+=hparams['hidden_size']
             cond_hs = cond_hs + hparams['hidden_size']   # for spk embedding
             from modules.diff.shallow_diffusion_tts import DiffusionDecoder
             self.ln_proj = nn.Linear(cond_hs, hparams["hidden_size"])
@@ -194,8 +188,6 @@ class StyleSinger(FastSpeech2):
         pitch_inp_domain_specific = (decoder_inp + spk_embed)
         if hparams['emo']:
             pitch_inp_domain_specific +=emo_embed
-        if hparams['style']:
-            pitch_inp_domain_specific +=style
         if hparams['tech']:
             pitch_inp_domain_specific+=tech
         pitch_inp_domain_specific *= tgt_nonpadding
@@ -346,15 +338,6 @@ class StyleSinger(FastSpeech2):
             g = torch.cat([g, ret['decoder_inp']], -1)
         g_spk_embed = ret['spk_embed'].repeat(1, T, 1)
         g = torch.cat([g, g_spk_embed], dim=-1)
-        if hparams['emo']:
-            g_emo_embed = ret['emo_embed'].repeat(1, T, 1)
-            g = torch.cat([g, g_emo_embed], dim=-1)
-        if hparams['style']:
-            l_style = ret['style']
-            g = torch.cat([g,l_style], dim=-1)
-        if hparams['tech']:
-            l_tech = ret['tech']
-            g = torch.cat([g,l_tech], dim=-1)
         g = self.ln_proj(g)
         if not infer:
             if is_training:
