@@ -191,7 +191,7 @@ class StyleSinger_dataset(BaseSingerdataset):
         if hparams['use_spk_embed']:
             spk_embed = torch.stack([s['spk_embed'] for s in samples])
             batch['spk_embed'] = spk_embed
-        if hp['use_spk_id']:
+        if hparams['use_spk_id']:
             spk_id = torch.LongTensor([s['spk_id'] for s in samples])
             batch['spk_id'] = spk_id
         if hparams['emo']:
