@@ -98,7 +98,7 @@ use_tone: true
 
 # training
 num_sanity_val_steps: -1
-max_updates: 320000
+max_updates: 160000
 max_sentences: 100000
 num_test_samples: 72
 
