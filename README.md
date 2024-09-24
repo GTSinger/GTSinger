@@ -14,6 +14,8 @@ Click [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Fac
 
 Besides, we also provide our dataset on [Google Drive](https://drive.google.com/drive/folders/1xcdvCxNAEEfJElt7sEP-xT8dMKxn1_Lz?usp=drive_link) and raw data on [Raw Data](https://drive.google.com/drive/folders/1vYtq_b7-rdBB4nIkzpfiTb6zFJJhgOP_?usp=drive_link).
 
+**We will update the full dataset soon**
+
 **Please note that, if you are using GTSinger, it means that you have accepted the terms of [license](https://github.com/GTSinger/GTSinger/blob/master/dataset_license.md).**
 
 ### Data Architecture
