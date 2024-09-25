@@ -1,8 +1,14 @@
 #  GTSinger: A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks
 
+#### Yu Zhang*, Changhao Pan*, Wenxiang Guo*, Ruiqi Li, Zhiyuan Zhu, Jialei Wang, Wenhao Xu, Jingyu Lu, Zhiqing Hong, Chuxin Wang, LiChao Zhang, Jinzheng He, Ziyue Jiang, Yuxin Chen, Chen Yang, Jiecheng Zhou, Xinyu Cheng, Zhou Zhao | Zhejiang University
+
+Dataset and code of [GTSinger (NeurIPS 2024)](https://arxiv.org/abs/2409.13832): A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks.
+
+[![arXiv](https://img.shields.io/badge/arXiv-Paper-<COLOR>.svg)](https://arxiv.org/abs/2409.13832)
+
 We introduce GTSinger, a large Global, multi-Technique, free-to-use, high-quality singing corpus with realistic music scores, designed for all singing tasks, along with its benchmarks.
 
-We provide the processing codes for our dataset and benchmarks' implementation in this repository. 
+We provide the corpus and processing codes for our dataset and benchmarks' implementation in this repository. 
 
 Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio samples of our dataset as well as the results of our benchmarks.
 
