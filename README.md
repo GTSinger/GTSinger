@@ -156,7 +156,12 @@ The code for our benchmarks for [Speech-to-Singing-Conversion](./STS%20Conversio
 
 If you find this code useful in your research, please cite our work:
 ```bib
-
+@article{zhang2024gtsinger,
+  title={GTSinger: A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks},
+  author={Zhang, Yu and Pan, Changhao and Guo, Wenxiang and Li, Ruiqi and Zhu, Zhiyuan and Wang, Jialei and Xu, Wenhao and Lu, Jingyu and Hong, Zhiqing and Wang, Chuxin and others},
+  journal={arXiv preprint arXiv:2409.13832},
+  year={2024}
+}
 ```
 
 ## Disclaimer ##
