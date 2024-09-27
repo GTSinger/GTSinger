@@ -2,7 +2,7 @@
 
 #### Yu Zhang*, Changhao Pan*, Wenxiang Guo*, Ruiqi Li, Zhiyuan Zhu, Jialei Wang, Wenhao Xu, Jingyu Lu, Zhiqing Hong, Chuxin Wang, LiChao Zhang, Jinzheng He, Ziyue Jiang, Yuxin Chen, Chen Yang, Jiecheng Zhou, Xinyu Cheng, Zhou Zhao | Zhejiang University
 
-Dataset and code of [GTSinger (NeurIPS 2024)](https://arxiv.org/abs/2409.13832): A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks.
+Dataset and code of [GTSinger (NeurIPS 2024 Spotlight)](https://arxiv.org/abs/2409.13832): A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks.
 
 [![arXiv](https://img.shields.io/badge/arXiv-Paper-<COLOR>.svg)](https://arxiv.org/abs/2409.13832)
 
