@@ -288,9 +288,9 @@ class SingingBinarizer(BaseBinarizer):
         self.word_encoder = None
         EmotionEncoder.load_model(hparams['emotion_encoder_path'])
         os.makedirs(hparams['binary_data_dir'], exist_ok=True)
-        for fn in ['phone_set.json', 'spker_set.json']:
-            remove_file(f"{hparams['binary_data_dir']}/{fn}")
-            copy_file(f"{hparams['processed_data_dir']}/{fn}", f"{hparams['binary_data_dir']}/{fn}")
+        # for fn in ['phone_set.json', 'spker_set.json']:
+        #     remove_file(f"{hparams['binary_data_dir']}/{fn}")
+        #     copy_file(f"{hparams['processed_data_dir']}/{fn}", f"{hparams['binary_data_dir']}/{fn}")
         self.process_data('valid')
         self.process_data('test')
         self.process_data('train')
@@ -350,14 +350,14 @@ class SingingBinarizer(BaseBinarizer):
 # 拥有midi标注的数据，以及给定ph_durs 而不是 textgrid的数据
 class StyleSingingBinarizer(SingingBinarizer):
     ph_encoder = build_token_encoder(os.path.join(hparams["processed_data_dir"], "phone_set.json"))
-    spker_map = json.load(open(os.path.join(hparams["processed_data_dir"], "spker_set.json")))
+    # spker_map = json.load(open(os.path.join(hparams["processed_data_dir"], "spker_set.json")))
     @classmethod
     def process_item(cls, item, binarization_args):
         item_name = item['item_name']
         wav_fn = item['wav_fn']
         wav, mel = cls.process_audio(wav_fn, item, binarization_args)
         item["ph_token"] = cls.ph_encoder.encode(' '.join(item["ph"]))
-        item["spk_id"] = cls.spker_map[item["singer"]]
+        # item["spk_id"] = cls.spker_map[item["singer"]]
 
         try:
             item["f0"] = f0 = np.load(wav_fn.replace(".wav", ".npy"))[:mel.shape[0]]
