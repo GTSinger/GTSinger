@@ -18,6 +18,12 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 - 2024.09: GTSinger is accepted by NeurIPS 2024 (Spotlight)!
 - 2024.05: We released the code of GTSinger!
 
+## TODO List
+✅ Release the code.
+✅ Releases the full dataset.
+🔲 Release the processed data and instructions for training StyleSinger.
+🔲 Further refine the French, Japanese, Korean, Italian, and Russian annotations.
+
 ## Dataset
 
 ### Where to download
