@@ -49,7 +49,7 @@ binarization_args:
   with_f0cwt: false
   with_linear: false
   with_spk_embed: true
-  with_spk_id: true
+  with_spk_id: false
   with_txt: true
   with_wav: true
   with_word: true
