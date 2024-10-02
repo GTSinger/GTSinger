@@ -136,7 +136,7 @@ The code for preprocessing the dataset is provided in `./Data-Process/data_prepr
 
 ## Technique Controllable Singing Voice Synthesis
 
-The code for our benchmarks for [Technique Controllable Singing Voice Synthesis](./Technique-Controllable%20SVS/readme.md).
+The code for our benchmarks for [Technique Controllable Singing Voice Synthesis](./Technique-Controllable%20SVS/readme.md). You can also use GTSinger to train [TCSinger](https://github.com/AaronZ345/TCSinger)!
 
 ## Technique Recognition
 
@@ -144,11 +144,11 @@ The code for our benchmarks for [Technique Recognition](./Tech-Recognition/readm
 
 ## Style Transfer
 
-The code for our benchmarks for [Style Transfer](./Style%20Transfer/readme.md).
+The code for our benchmarks for [Style Transfer](./Style%20Transfer/readme.md). You can use GTSinger to train [StyleSinger](https://github.com/AaronZ345/StyleSinger) and [TCSinger](https://github.com/AaronZ345/TCSinger)!
 
 ## Speech-to-Singing Conversion
 
-The code for our benchmarks for [Speech-to-Singing-Conversion](./STS%20Conversion/readme.md).
+The code for our benchmarks for [Speech-to-Singing-Conversion](./STS%20Conversion/readme.md). You can use GTSinger to train [AlignSTS](https://github.com/RickyL-2000/AlignSTS)!
 
 ## Citations ##
 
