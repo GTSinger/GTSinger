@@ -20,8 +20,11 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 
 ## TODO List
 ✅ Release the code.
+
 ✅ Releases the full dataset.
+
 🔲 Release the processed data and instructions for training StyleSinger.
+
 🔲 Further refine the French, Japanese, Korean, Italian, and Russian annotations.
 
 ## Dataset
