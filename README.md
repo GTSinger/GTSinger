@@ -23,7 +23,7 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 
 ✅ Releases the full dataset.
 
-🔲 Release the processed data and instructions for training StyleSinger.
+🔲 Release the processed data and checkpoints for StyleSinger.
 
 🔲 Further refine the French, Japanese, Korean, Italian, and Russian annotations.
 
