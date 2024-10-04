@@ -31,7 +31,7 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 
 ### Where to download
 
-Click [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-blue?label=Dataset)](https://huggingface.co/datasets/GTSinger/GTSinger) to access our **full dataset** (audio along with TextGrid, json, musicxml) on Hugging Face **for free**! Hope our data is helpful for your research.
+Click [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-blue?label=Dataset)](https://huggingface.co/datasets/GTSinger/GTSinger) to access our **full dataset** (audio along with TextGrid, json, musicxml) and **processed data** (metadata.json, phone_Set.json, spker_set.json) on Hugging Face **for free**! Hope our data is helpful for your research.
 
 Besides, we also provide our dataset on [Google Drive](https://drive.google.com/drive/folders/1xcdvCxNAEEfJElt7sEP-xT8dMKxn1_Lz?usp=drive_link).
 
