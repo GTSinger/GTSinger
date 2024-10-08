@@ -23,7 +23,7 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 
 ✅ Release the full dataset.
 
-✅ release the processed data of Chinese, English, Spanish, German.
+✅ Release the processed data of Chinese, English, Spanish, German.
 
 ✅ Refine the paired speech data of each language.
 
