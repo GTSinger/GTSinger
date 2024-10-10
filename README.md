@@ -23,13 +23,13 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 
 ✅ Release the full dataset.
 
-✅ Release the processed data of Chinese, English, Spanish, German.
+✅ Release the processed data of Chinese, English, Spanish, German, Russian.
 
 ✅ Refine the paired speech data of each language.
 
 🔲 Release the remaining processed data and checkpoints for StyleSinger.
 
-🔲 Further refine the French, Japanese, Korean, Italian, and Russian annotations.
+🔲 Further refine the French, Japanese, Korean, Italian annotations.
 
 ## Dataset
 
