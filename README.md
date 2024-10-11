@@ -29,7 +29,7 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 
 🔲 Release the remaining processed data and checkpoints for StyleSinger.
 
-🔲 Further refine the English, French, Japanese, Korean, Italian annotations.
+🔲 Further refine English, French, Japanese, Korean, Italian annotations.
 
 ## Dataset
 
