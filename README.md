@@ -5,6 +5,9 @@
 Dataset and code of [GTSinger (NeurIPS 2024 Spotlight)](https://arxiv.org/abs/2409.13832): A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks.
 
 [![arXiv](https://img.shields.io/badge/arXiv-Paper-<COLOR>.svg)](https://arxiv.org/abs/2409.13832)
+[![weixin](https://img.shields.io/badge/-WeChat@机器之心-000000?logo=wechat&logoColor=07C160)](https://mp.weixin.qq.com/s/B1Iqr-24l57f0MslzYEslA)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-blue?label=Dataset)](https://huggingface.co/datasets/GTSinger/GTSinger)
+[![Google Drive](https://img.shields.io/badge/Google%20Drive-Link-blue?logo=googledrive&logoColor=white)](https://drive.google.com/drive/folders/1xcdvCxNAEEfJElt7sEP-xT8dMKxn1_Lz?usp=drive_link)
 [![GitHub Stars](https://img.shields.io/github/stars/GTSinger/GTSinger?style=social)](https://github.com/GTSinger/GTSinger)
 
 We introduce GTSinger, a large Global, multi-Technique, free-to-use, high-quality singing corpus with realistic music scores, designed for all singing tasks, along with its benchmarks.
