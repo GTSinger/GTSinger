@@ -1,4 +1,4 @@
-#  GTSinger: A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks
+![image](https://github.com/user-attachments/assets/49a48e74-d9e4-45b6-ab30-8c187cabe69c)![image](https://github.com/user-attachments/assets/a15834b2-60f3-40eb-b8d5-d2747fe4be0f)#  GTSinger: A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks
 
 #### Yu Zhang*, Changhao Pan*, Wenxiang Guo*, Ruiqi Li, Zhiyuan Zhu, Jialei Wang, Wenhao Xu, Jingyu Lu, Zhiqing Hong, Chuxin Wang, LiChao Zhang, Jinzheng He, Ziyue Jiang, Yuxin Chen, Chen Yang, Jiecheng Zhou, Xinyu Cheng, Zhou Zhao | Zhejiang University
 
@@ -18,11 +18,13 @@ We provide the corpus and processing codes for our dataset and benchmarks' imple
 Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio samples of our dataset as well as the results of our benchmarks.
 
 ## News
+
 - 2024.09: We released the full dataset of GTSinger!
 - 2024.09: GTSinger is accepted by NeurIPS 2024 (Spotlight)!
 - 2024.05: We released the code of GTSinger!
 
 ## TODO List
+
 ✅ Release the code.
 
 ✅ Release the full dataset.
@@ -34,6 +36,14 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 🔲 Release the remaining processed data and checkpoints for StyleSinger.
 
 🔲 Further refine English, French, Japanese, Korean, Italian annotations.
+
+## Key Features
+
+- **80.59 hours of singing voices** in GTSinger are recorded in professional studios by skilled singers, ensuring **high quality and clarity**, forming the largest recorded singing dataset.
+- Contributed by **20 singers** across **nine widely spoken languages** (Chinese, English, Japanese, Korean, Russian, Spanish, French, German, and Italian) and all four vocal ranges, GTSinger enables zero-shot SVS and style transfer models to learn diverse timbres and styles.
+- GTSinger provides **controlled comparison** and **phoneme-level annotations** of **six singing techniques** (mixed voice, falsetto, breathy, pharyngeal, vibrato, and glissando) for songs, thereby facilitating singing technique modeling, recognition, and control.
+- Unlike fine-grained music scores, GTSinger features **realistic music scores** with regular note duration, assisting singing models in learning and adapting to real-world musical composition.
+- The dataset includes **manual phoneme-to-audio alignments, global style labels (singing method, emotion, range, and pace), and 16.16 hours of paired speech**, ensuring comprehensive annotations and broad task suitability.
 
 ## Dataset
 
@@ -117,11 +127,11 @@ Here is the data structure of our dataset:
     └── ES-Soprano-1
 ```
 
-### Code for preprocessing
+## Code for preprocessing data
 
 The code for processing the dataset is provided in the `./Data-Process`.
 
-#### Dependencies
+### Dependencies
 
 A suitable [conda](https://docs.conda.io/en/latest/) environment named `gt_dataprocess` can be created and activated with:
 
@@ -131,7 +141,7 @@ conda activate gt_dataprocess
 pip install -r requirements.txt
 ```
 
-#### Data Check
+### Data Check
 
 The code for checking the dataset is provided in `./Data-Process/data_check/`, including the following files:
 
@@ -145,7 +155,7 @@ The code for checking the dataset is provided in `./Data-Process/data_check/`, i
 
 - `plot_mel.py`: Plot the mel-spectrogram of audio.
 
-#### Data Preprocessing
+### Data Preprocessing
 
 The code for preprocessing the dataset is provided in `./Data-Process/data_preprocess/`, including the following files:
 
@@ -155,21 +165,23 @@ The code for preprocessing the dataset is provided in `./Data-Process/data_prepr
 
 - `seg_singing.py` & `seg_speech.py`: Segment the singing voice and speech based on the TextGrid file.
 
-- `gen_xml.py` : For the generation and processing of xml.
+- `gen_xml.py` : For the generation and processing of XML.
 
-## Technique Controllable Singing Voice Synthesis
+## Code for benchmarks
+
+### Technique Controllable Singing Voice Synthesis
 
 The code for our benchmarks for [Technique Controllable Singing Voice Synthesis](./Technique-Controllable%20SVS/readme.md). You can also use GTSinger to train [TCSinger](https://github.com/AaronZ345/TCSinger)!
 
-## Technique Recognition
+### Technique Recognition
 
 The code for our benchmarks for [Technique Recognition](./Tech-Recognition/readme.md).
 
-## Style Transfer
+### Style Transfer
 
 The code for our benchmarks for [Style Transfer](./Style%20Transfer/readme.md). You can use GTSinger to train [StyleSinger](https://github.com/AaronZ345/StyleSinger) and [TCSinger](https://github.com/AaronZ345/TCSinger)!
 
-## Speech-to-Singing Conversion
+### Speech-to-Singing Conversion
 
 The code for our benchmarks for [Speech-to-Singing-Conversion](./STS%20Conversion/readme.md). You can use GTSinger to train [AlignSTS](https://github.com/RickyL-2000/AlignSTS)!
 
