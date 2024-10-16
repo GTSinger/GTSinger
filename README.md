@@ -43,7 +43,7 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 - Contributed by **20 singers** across **nine widely spoken languages** (Chinese, English, Japanese, Korean, Russian, Spanish, French, German, and Italian) and all four vocal ranges, GTSinger enables zero-shot SVS and style transfer models to learn diverse timbres and styles.
 - GTSinger provides **controlled comparison** and **phoneme-level annotations** of **six singing techniques** (mixed voice, falsetto, breathy, pharyngeal, vibrato, and glissando) for songs, thereby facilitating singing technique modeling, recognition, and control.
 - Unlike fine-grained music scores, GTSinger features **realistic music scores** with regular note duration, assisting singing models in learning and adapting to real-world musical composition.
-- The dataset includes **manual phoneme-to-audio alignments, global style labels (singing method, emotion, range, and pace), and 16.16 hours of paired speech**, ensuring comprehensive annotations and broad task suitability.
+- The dataset includes **manual phoneme-to-audio alignments, global style labels** (singing method, emotion, range, and pace), and **16.16 hours of paired speech**, ensuring comprehensive annotations and broad task suitability.
 
 ## Dataset
 
