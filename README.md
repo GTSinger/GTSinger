@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/49a48e74-d9e4-45b6-ab30-8c187cabe69c)![image](https://github.com/user-attachments/assets/a15834b2-60f3-40eb-b8d5-d2747fe4be0f)#  GTSinger: A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks
+#  GTSinger: A Global Multi-Technique Singing Corpus with Realistic Music Scores for All Singing Tasks
 
 #### Yu Zhang*, Changhao Pan*, Wenxiang Guo*, Ruiqi Li, Zhiyuan Zhu, Jialei Wang, Wenhao Xu, Jingyu Lu, Zhiqing Hong, Chuxin Wang, LiChao Zhang, Jinzheng He, Ziyue Jiang, Yuxin Chen, Chen Yang, Jiecheng Zhou, Xinyu Cheng, Zhou Zhao | Zhejiang University
 
