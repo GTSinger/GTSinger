@@ -35,9 +35,9 @@ Also, you can visit our [Demo Page](https://gtsinger.github.io/) for the audio s
 
 ✅ Refine Chinese, Spanish, German, Russian annotations.
 
-🔲 Further refine English, French, Japanese, Korean, Italian annotations (planned to be completed by the end of 2024).
+🔲 Further refine English, French, Japanese, Korean, Italian annotations *(planned to be completed by the end of 2024)*.
 
-🔲 Release the remaining processed data (planned to be completed by the end of 2024).
+🔲 Release the remaining processed data *(planned to be completed by the end of 2024)*.
 
 ## Key Features
 
